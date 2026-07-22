@@ -119,8 +119,10 @@ GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w" \
 
 | 平台 | 動作 |
 |------|------|
-| Windows | 檔案總管雙擊 `nrf-factory-windows-amd64.exe` |
-| macOS | Finder 雙擊 `exec.command`（開終端機並跑對應架構執行檔） |
+| Windows | 進 `dist/` 資料夾，檔案總管雙擊 `nrf-factory-windows-amd64.exe` |
+| macOS | Finder 雙擊 `exec.command`（開終端機並跑 `dist/` 內執行檔） |
+
+> release zip 解壓後的結構與 `make dist` 完全一致：執行檔在 `dist/`，`exec.command` 與文件在根層。因此本節所有 `dist/…` 路徑在「解壓的 release zip」與「從原始碼建置」兩種情境都適用。
 
 或在終端直接跑：
 
