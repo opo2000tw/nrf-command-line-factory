@@ -2,6 +2,14 @@
 
 本專案採 SemVer；git tag 慣例 `vMAJOR.MINOR.PATCH`。版號與 bump 規則見 `tickets/release-01-versioning-policy.md`。
 
+## [0.1.3]
+
+### Fixed
+- 後端斷線時的按鈕鎖定：離線（無法連線本機服務）時，除了 flash，清除計數與安裝 device 命令按鈕也一併停用，避免按下去才報錯；先前只有 flash 會停用。
+
+### Added
+- Playwright 功能測試套件：以 route mock 涵蓋 UI 的所有按鈕與輸入（firmware/tool 選檔、L/R 選側、燒錄成功/失敗/忙碌/離線、清除計數、安裝 device 命令），不需 nrfutil 或 J-Link 硬體即可執行；CI 新增 ui-test job 一併跑過。
+
 ## [0.1.2]
 
 ### Added
