@@ -30,6 +30,10 @@ go.work.sum
 .DS_Store
 Thumbs.db
 
+# Firmware — external per design, never commit (proprietary images)
+*.hex
+/test/
+
 # other
 .specstory
 .codegraph/
