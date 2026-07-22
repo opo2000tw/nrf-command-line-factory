@@ -152,18 +152,40 @@ func TestProbeJLink(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("J-Link probe fixture is unix-only")
 	}
-	dir := t.TempDir()
-	t.Setenv("PATH", dir)
-	if ok, msg := probeJLink(); ok || msg == "" {
-		t.Fatalf("expected J-Link missing on empty PATH dir, got ok=%v msg=%q", ok, msg)
+	pathDir := t.TempDir()
+	installRoot := t.TempDir()
+	t.Setenv("PATH", pathDir)
+	prev := jLinkSearchGlobs
+	jLinkSearchGlobs = []string{filepath.Join(installRoot, "JLink*", "JLinkExe")}
+	t.Cleanup(func() { jLinkSearchGlobs = prev })
+
+	// nothing on PATH and nothing installed
+	if ok, msg := probeJLink("nonexistent-nrfutil"); ok || msg == "" {
+		t.Fatalf("expected J-Link missing, got ok=%v msg=%q", ok, msg)
 	}
 
-	fake := filepath.Join(dir, "JLinkExe")
-	if err := os.WriteFile(fake, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	// detected via PATH
+	pathFake := filepath.Join(pathDir, "JLinkExe")
+	if err := os.WriteFile(pathFake, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if ok, _ := probeJLink(); !ok {
+	if ok, _ := probeJLink("nonexistent-nrfutil"); !ok {
 		t.Fatal("expected J-Link detected via JLinkExe on PATH")
+	}
+	if err := os.Remove(pathFake); err != nil {
+		t.Fatal(err)
+	}
+
+	// detected via the standard install dir without any PATH entry
+	instDir := filepath.Join(installRoot, "JLink_V794")
+	if err := os.MkdirAll(instDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(instDir, "JLinkExe"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if ok, _ := probeJLink("nonexistent-nrfutil"); !ok {
+		t.Fatal("expected J-Link detected via the standard install dir without PATH")
 	}
 }
 

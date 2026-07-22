@@ -2,6 +2,11 @@
 
 本專案採 SemVer；git tag 慣例 `vMAJOR.MINOR.PATCH`。版號與 bump 規則見 `tickets/release-01-versioning-policy.md`。
 
+## [Unreleased]
+
+### Fixed
+- J-Link 偵測改為同時掃 SEGGER 標準安裝路徑（Windows `C:\Program Files\SEGGER\JLink[_V*]`、macOS `/Applications/SEGGER/JLink*`）與 PATH：安裝 J-Link 後不必手動設 PATH 即可轉綠。缺 J-Link 時的訊息會附上 nrfutil 回報的 tested 版，指出該裝哪一版。
+
 ## [0.1.1]
 
 ### Fixed

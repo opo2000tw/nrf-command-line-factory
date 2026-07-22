@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -597,15 +598,89 @@ func probeNRFUtil(command string) (bool, string) {
 	return true, coreVersion + " · " + deviceVersion
 }
 
-// probeJLink reports whether the SEGGER J-Link runtime is installed.
-// ponytail: presence check only — the actual link is verified later by `nrfutil device list`.
-func probeJLink() (bool, string) {
+// jLinkSearchGlobs lists glob patterns for the SEGGER J-Link executable in its
+// standard install directories. It is a variable so tests can point it at a
+// fixture. The SEGGER installer usually does NOT add J-Link to PATH, so we look
+// here as well instead of forcing the operator to edit PATH.
+var jLinkSearchGlobs = defaultJLinkGlobs()
+
+func defaultJLinkGlobs() []string {
+	switch runtime.GOOS {
+	case "windows":
+		var globs []string
+		for _, base := range []string{os.Getenv("ProgramFiles"), os.Getenv("ProgramFiles(x86)")} {
+			if base == "" {
+				continue
+			}
+			globs = append(globs,
+				filepath.Join(base, "SEGGER", "JLink", "JLink.exe"),
+				filepath.Join(base, "SEGGER", "JLink_*", "JLink.exe"),
+			)
+		}
+		return globs
+	case "darwin":
+		return []string{
+			"/Applications/SEGGER/JLink/JLinkExe",
+			"/Applications/SEGGER/JLink_*/JLinkExe",
+		}
+	default:
+		return []string{
+			"/opt/SEGGER/JLink/JLinkExe",
+			"/opt/SEGGER/JLink_*/JLinkExe",
+		}
+	}
+}
+
+// findJLinkInstall returns the first SEGGER J-Link executable found in the
+// standard install locations.
+func findJLinkInstall() (string, bool) {
+	for _, pattern := range jLinkSearchGlobs {
+		matches, _ := filepath.Glob(pattern)
+		for _, match := range matches {
+			if info, err := os.Stat(match); err == nil && !info.IsDir() {
+				return match, true
+			}
+		}
+	}
+	return "", false
+}
+
+var jLinkExpectedRe = regexp.MustCompile(`"expectedVersion"\s*:\s*\{\s*"version"\s*:\s*"([^"]+)"`)
+
+// testedJLinkVersion asks nrfutil which J-Link version the device command was
+// tested against, so a missing-J-Link message can name the right one. Returns
+// "" when it cannot be determined.
+func testedJLinkVersion(command string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, command, "device", "--version", "--json").CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	if m := jLinkExpectedRe.FindSubmatch(out); m != nil {
+		return string(m[1])
+	}
+	return ""
+}
+
+// probeJLink reports whether the SEGGER J-Link runtime is present, checking both
+// PATH and the standard install directory — a default Windows install does not
+// touch PATH, so PATH alone is not enough. ponytail: presence check only; the
+// actual link is verified later by `nrfutil device list`.
+func probeJLink(command string) (bool, string) {
 	for _, name := range []string{"JLinkExe", "JLink"} {
 		if _, err := exec.LookPath(name); err == nil {
 			return true, ""
 		}
 	}
-	return false, "找不到 SEGGER J-Link，請安裝 J-Link Software（Nordic nRF Command Line Tools 或 SEGGER 官網）"
+	if _, ok := findJLinkInstall(); ok {
+		return true, ""
+	}
+	msg := "找不到 SEGGER J-Link；請安裝 J-Link Software（SEGGER 官網），裝到標準路徑即可、不必手動設 PATH"
+	if v := testedJLinkVersion(command); v != "" {
+		msg += "。對應 tested 版：" + v + "（較新版通常亦可）"
+	}
+	return false, msg
 }
 
 // preflight aggregates the environment checks and names whichever tool is missing.
@@ -614,7 +689,7 @@ func preflight(command string) (bool, string) {
 	if !ready {
 		return false, message
 	}
-	if ok, jmsg := probeJLink(); !ok {
+	if ok, jmsg := probeJLink(command); !ok {
 		return false, jmsg
 	}
 	return true, message + " · J-Link OK"

@@ -77,12 +77,12 @@ nrfutil-device 2.19.1 …
 1. 下載總覽：[SEGGER J-Link downloads](https://www.segger.com/downloads/jlink/)，接受 SEGGER 授權後下載 **Software and Documentation Pack**。
 2. 版本以 A.1 節官方指令查出的 tested 版為準（目前 device 2.19.1 對應 V9.24a）；較新版通常可用，異常時再切回 tested 版。
 
-| 平台 | 安裝後應能在 PATH 找到 |
-|------|------------------------|
-| Windows | `JLink.exe`（或安裝程式加入 PATH 的同等命令） |
-| macOS | `JLinkExe` |
+| 平台 | 執行檔（程式自動偵測，不必在 PATH） |
+|------|--------------------------------------|
+| Windows | `JLink.exe`（`C:\Program Files\SEGGER\JLink` 或 `JLink_V*`） |
+| macOS | `JLinkExe`（`/Applications/SEGGER/JLink*`） |
 
-Windows 安裝時請勾選把 J-Link 加入 PATH，或手動把安裝目錄加入系統 PATH。nRF Factory 啟動時的 preflight 檢查會尋找 `JLinkExe`（Unix）或 `JLink`（Windows 常見名）。
+nRF Factory 會**自動偵測標準安裝路徑**（上表位置），同時也查 PATH；因此把 J-Link 裝到預設位置即可，**不必手動加進 PATH**。
 
 mac 開發機可選：`brew install --cask segger-jlink`；**Windows 產線一律用 SEGGER 官網安裝包**，不要用第三方套件管理工具。
 
@@ -102,8 +102,6 @@ Windows（cmd / PowerShell，實際命令名依安裝結果為準）：
 nrfutil --version
 nrfutil device --version
 nrfutil device list --traits jlink --json
-where JLink
-JLink
 ```
 
 通過條件：
