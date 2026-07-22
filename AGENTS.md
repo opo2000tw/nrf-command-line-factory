@@ -4,7 +4,7 @@
 
 `README.md` defines a Go-based nRF programming desktop application for Windows 10 and 11, with external firmware selection, L/R target selection, status output, and success counters.
 
-As implementation is added, place executable entry points in `cmd/nrf-factory/`, reusable device and application logic in `internal/`, and UI resources in `assets/`. Keep Go tests beside the package they exercise as `*_test.go`. Write generated executables to `dist/` and keep that directory untracked. Firmware images must remain external files selected at runtime; do not embed them in the application.
+The executable entry point and application logic live directly in `cmd/nrf-factory/` (`main.go`, `browser.go`), with the embedded UI at `cmd/nrf-factory/web/index.html`. Keep Go tests beside the code they exercise as `*_test.go`. Cross-compiled binaries go to `dist/` (untracked). Firmware images must remain external files selected at runtime; do not embed them in the application.
 
 ## Build, Test, and Development Commands
 
@@ -15,7 +15,7 @@ After `go.mod` and the initial source tree are present, use these standard comma
 - `go vet ./...` checks common correctness issues.
 - `go test ./...` runs the complete test suite.
 - `go build ./...` verifies that every package builds.
-- `GOOS=windows GOARCH=amd64 go build -o dist/nrf-factory.exe ./cmd/nrf-factory` creates the Windows executable from macOS or Linux.
+- `make dist` cross-compiles the release binaries (windows/amd64, darwin/arm64) into `dist/` with version stamping; `make package` also builds the release zips and `SHA256SUMS`. A bare `GOOS=windows GOARCH=amd64 go build -o dist/nrf-factory-windows-amd64.exe ./cmd/nrf-factory` works too but reports version `dev`.
 
 Do not document a command as supported until its required module, package, or configuration file is committed.
 

@@ -23,7 +23,7 @@
 | ID | 標題 | 優先 | 狀態 |
 | --- | --- | --- | --- |
 | [release-01](release-01-versioning-policy.md) | 版號策略（SemVer + tag + CHANGELOG） | P1 | done |
-| [release-02](release-02-github-release.md) | GitHub Release 發布流程 | P1 | doing |
+| [release-02](release-02-github-release.md) | GitHub Release 發布流程 | P1 | done |
 
 ## Run
 
