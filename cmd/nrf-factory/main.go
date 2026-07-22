@@ -456,6 +456,29 @@ func probeNRFUtil(command string) (bool, string) {
 	return true, coreVersion + " · " + deviceVersion
 }
 
+// probeJLink reports whether the SEGGER J-Link runtime is installed.
+// ponytail: presence check only — the actual link is verified later by `nrfutil device list`.
+func probeJLink() (bool, string) {
+	for _, name := range []string{"JLinkExe", "JLink"} {
+		if _, err := exec.LookPath(name); err == nil {
+			return true, ""
+		}
+	}
+	return false, "找不到 SEGGER J-Link，請安裝 J-Link Software（Nordic nRF Command Line Tools 或 SEGGER 官網）"
+}
+
+// preflight aggregates the environment checks and names whichever tool is missing.
+func preflight(command string) (bool, string) {
+	ready, message := probeNRFUtil(command)
+	if !ready {
+		return false, message
+	}
+	if ok, jmsg := probeJLink(); !ok {
+		return false, jmsg
+	}
+	return true, message + " · J-Link OK"
+}
+
 func firstOutputLine(ctx context.Context, name string, args ...string) (string, error) {
 	output, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
 	if err != nil {
@@ -503,7 +526,7 @@ func main() {
 	if command == "" {
 		command = "nrfutil"
 	}
-	ready, message := probeNRFUtil(command)
+	ready, message := preflight(command)
 	application := newApp(command, execCommand, ready, message)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")

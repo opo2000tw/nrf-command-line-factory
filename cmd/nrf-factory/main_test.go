@@ -10,7 +10,10 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -142,6 +145,25 @@ func TestResetCounts(t *testing.T) {
 	}
 	if state.LeftCount != 0 || state.RightCount != 0 {
 		t.Fatalf("state = %+v", state)
+	}
+}
+
+func TestProbeJLink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("J-Link probe fixture is unix-only")
+	}
+	dir := t.TempDir()
+	t.Setenv("PATH", dir)
+	if ok, msg := probeJLink(); ok || msg == "" {
+		t.Fatalf("expected J-Link missing on empty PATH dir, got ok=%v msg=%q", ok, msg)
+	}
+
+	fake := filepath.Join(dir, "JLinkExe")
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if ok, _ := probeJLink(); !ok {
+		t.Fatal("expected J-Link detected via JLinkExe on PATH")
 	}
 }
 

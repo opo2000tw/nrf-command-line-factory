@@ -15,6 +15,7 @@ profile.cov
 # Build output
 /build/
 /dist/
+/nrf-factory
 
 # Local Go workspace and environment
 go.work

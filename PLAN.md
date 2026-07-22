@@ -23,7 +23,7 @@
 - macOS 與 Windows 共用同一份 Go/SPA 原始碼，但執行檔必須分平台編譯，不能互相執行。
 - 產物是單一 Go 執行檔，只內嵌 UI；不夾帶任何 `nrfutil`、`device` command 或 J-Link 資產，因此不需平台專屬的嵌入 build-tag 檔。
 - 工站須自行安裝 nRF Util（並執行 `nrfutil install device`）與 SEGGER J-Link；這些工具各帶 Nordic／SEGGER 授權，不由本程式重散布。nRF Command Line Tools 已封存，改用 nRF Util。
-- `nrfutil` 由 `PATH` 或 `NRFUTIL_PATH` 探測。啟動 preflight 逐項檢查並回報：找不到 `nrfutil`、缺 `device` command、或 J-Link 不可用時，分別在畫面顯示「缺哪一項」與對應安裝指引；缺工具不阻擋 UI 載入，但擋住燒錄。
+- `nrfutil` 由 `PATH` 或 `NRFUTIL_PATH` 探測。啟動 preflight 逐項檢查並回報：找不到 `nrfutil`、缺 `device` command、或 J-Link 不可用時，分別在畫面顯示「缺哪一項」與對應安裝指引；缺工具不阻擋 UI 載入，燒錄仍可觸發，但會在 `nrfutil device list` 裝置列舉階段以明確錯誤中止，不誤動作或誤增計數。
 - 版本不由程式固定；preflight 讀出實際安裝的 `nrfutil` 與 `device` 版本顯示在狀態列，方便現場核對與更新後重測。
 
 ## 逐步實作與測試
@@ -44,7 +44,7 @@
 
 ### 階段三：nRF Util 唯讀整合
 
-- 啟動 preflight 分項檢查 `nrfutil --version`、`nrfutil device --version` 與 SEGGER J-Link 可用性；任一缺少就在 GUI 指出「缺哪一項」與安裝方式，全部齊備才允許燒錄。
+- 啟動 preflight 分項檢查 `nrfutil --version`、`nrfutil device --version` 與 SEGGER J-Link 可用性；任一缺少就在 GUI 指出「缺哪一項」與安裝方式；工具缺失時實際燒錄會在裝置列舉階段以錯誤中止。
 - 使用 `nrfutil device list` 找出支援的 J-Link serial number；如需機器解析，使用官方 JSON Lines 輸出而非解析人類可讀文字。
 - 在 macOS 與 Windows 分別跑版本檢查、裝置列舉及錯誤情境；本階段不執行 erase 或 program。
 
