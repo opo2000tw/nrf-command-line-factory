@@ -1,0 +1,13 @@
+{
+  "name": "nrf-factory-ui-tests",
+  "private": true,
+  "description": "Playwright functional tests for the nRF Factory web UI",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  }
+}

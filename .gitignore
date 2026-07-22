@@ -37,6 +37,14 @@ Thumbs.db
 *.hex
 /test/
 
+# Node / Playwright (UI functional tests)
+/node_modules/
+/tests/.bin/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # other
 .specstory
 .codegraph/
