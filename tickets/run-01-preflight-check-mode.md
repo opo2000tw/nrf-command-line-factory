@@ -15,5 +15,5 @@
 - [ ] `-check` 模式沿用與 UI 啟動時相同的 preflight 邏輯，不重複實作
 
 ## 相關
-- 檔案: cmd/nrf-factory/main.go, docs/INSTALL-TOOLS.md
+- 檔案: cmd/nrf-factory/main.go, docs/INSTALL-AND-RUN.md
 - 依賴: -

@@ -10,8 +10,8 @@
 ## 驗收條件
 - [ ] 評估並決策以下三個方向之一：(a) 維持未簽章並在文件中說明 xattr 操作、(b) 採用 ad-hoc codesign、(c) 採用 Developer ID 簽章並送 notarize
 - [ ] 若採用簽章方案，記錄所用憑證與 codesign / notarytool 的操作步驟
-- [ ] 更新 README 與 docs/INSTALL-TOOLS.md 反映最終決策
+- [ ] 更新 README 與 docs/INSTALL-AND-RUN.md 反映最終決策
 
 ## 相關
-- 檔案: README.md, docs/INSTALL-TOOLS.md
+- 檔案: README.md, docs/INSTALL-AND-RUN.md
 - 依賴: package-02

@@ -33,7 +33,7 @@ tel. 886-4-22312859 · fax. 886-4-22362118
 ### 工站前置條件
 
 程式本身**不附帶** Nordic / SEGGER 工具，工站需先裝好。  
-**固定版本與官方下載步驟**見 **[docs/INSTALL-TOOLS.md](docs/INSTALL-TOOLS.md)**（對齊本開發機已驗證組合）。
+**固定版本與官方下載步驟**見 **[docs/INSTALL-AND-RUN.md](docs/INSTALL-AND-RUN.md)**（對齊本開發機已驗證組合）。
 
 | 項目 | 版本 | 用途 |
 |------|------|------|
@@ -97,7 +97,7 @@ make package    # 承上，另外把各平台打包成 zip 並寫出 dist/SHA256
 | `nrf-factory-windows-amd64.exe` | Windows 10/11 x64（主目標） |
 | `nrf-factory-darwin-arm64` | macOS Apple Silicon |
 
-`make package` 會為每個平台產出 `dist/nrf-factory-<version>-<os>-<arch>.zip`（內含 `dist/` 執行檔、README、docs/INSTALL-TOOLS.md），以及對應的 `dist/SHA256SUMS`。
+`make package` 會為每個平台產出 `dist/nrf-factory-<version>-<os>-<arch>.zip`（內含 `dist/` 執行檔、`CHANGELOG.md`、`docs/INSTALL-AND-RUN.md`），以及對應的 `dist/SHA256SUMS`。
 
 建置會用 `-ldflags -X` 把版本注入執行檔（`main.version` / `main.commit` / `main.date`），版本字串取自 `git describe --tags --always --dirty`；執行 `<binary> -version` 會印出目前版本。
 
