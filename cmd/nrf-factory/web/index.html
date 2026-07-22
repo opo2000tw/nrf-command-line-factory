@@ -488,7 +488,7 @@
           <span class="log-line">系統已啟動，等待韌體。</span>
         </div>
         <div class="console-foot">
-          <span>Loopback only · firmware removed after run</span>
+          <span>Loopback only · firmware removed after run · <span id="appVersion">—</span></span>
           <span class="busy-mark">programming</span>
         </div>
       </section>
@@ -546,6 +546,8 @@
       if (state.command && state.command !== "nrfutil") {
         toolFileName.textContent = state.command.split(/[\\/]/).pop();
       }
+      const appVersion = document.querySelector("#appVersion");
+      if (appVersion) appVersion.textContent = state.version || "—";
       setBusy(state.busy);
     }
 

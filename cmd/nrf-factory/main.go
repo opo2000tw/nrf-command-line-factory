@@ -33,6 +33,14 @@ const (
 	installTimeout  = 10 * time.Minute
 )
 
+// Build metadata, injected via
+// -ldflags "-X main.version=... -X main.commit=... -X main.date=...".
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 //go:embed web/index.html
 var webFiles embed.FS
 
@@ -57,6 +65,7 @@ type snapshot struct {
 	ToolReady   bool   `json:"toolReady"`
 	ToolMessage string `json:"toolMessage"`
 	Command     string `json:"command"`
+	Version     string `json:"version"`
 }
 
 type apiEvent struct {
@@ -423,6 +432,7 @@ func (a *app) currentSnapshot() snapshot {
 		ToolReady:   a.toolReady,
 		ToolMessage: a.toolMessage,
 		Command:     a.command,
+		Version:     version,
 	}
 }
 
@@ -651,9 +661,15 @@ func openBrowser(url string) error {
 
 func main() {
 	noBrowser := flag.Bool("no-browser", false, "serve only; do not launch a browser")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	// :0 = OS picks a free port. Set e.g. 127.0.0.1:17832 for a fixed factory port.
 	addr := flag.String("addr", "127.0.0.1:0", "loopback listen address (host:port)")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("nRF Factory %s (%s, built %s)\n", version, commit, date)
+		return
+	}
 
 	command := strings.TrimSpace(os.Getenv("NRFUTIL_PATH"))
 	if command == "" {
@@ -671,6 +687,7 @@ func main() {
 		log.Fatal(err)
 	}
 	url := "http://" + listener.Addr().String()
+	fmt.Printf("nRF Factory %s\n", version)
 	fmt.Println("nRF Factory:", url)
 
 	server := &http.Server{
