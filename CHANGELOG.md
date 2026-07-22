@@ -13,5 +13,5 @@
 - 文件：nRF Util 元件與版本管理、Windows / Parallels 驗證紀錄、build→run pipeline tickets。
 
 ### Changed
-- 啟動改為單一自足執行檔：移除 `exec.sh` / `exec.bat` / `scripts/browser-app.sh`，`exec.command` 收斂為雙擊啟動器；README 改為「雙擊平台 exe」。
+- 啟動改為單一自足執行檔：移除 `exec.sh` / `exec.bat` / `scripts/browser-app.sh` 與 `exec.command`；macOS 直接雙擊執行檔（Finder 以終端機執行 Unix 執行檔），README 改為「雙擊平台 exe」。
 - J-Link 版本以 `nrfutil device --version` 報的 tested 版為準（現 V9.24a），不再以某台機器現裝版為基準。

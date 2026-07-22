@@ -43,7 +43,7 @@ dist:
 package: dist
 	rm -f $(DIST)/*.zip $(DIST)/SHA256SUMS
 	zip -q $(DIST)/nrf-factory-$(VERSION)-windows-amd64.zip $(DIST)/$(BIN_WIN) README.md docs/INSTALL-TOOLS.md
-	zip -q $(DIST)/nrf-factory-$(VERSION)-darwin-arm64.zip  $(DIST)/$(BIN_MAC_ARM) README.md docs/INSTALL-TOOLS.md exec.command
+	zip -q $(DIST)/nrf-factory-$(VERSION)-darwin-arm64.zip  $(DIST)/$(BIN_MAC_ARM) README.md docs/INSTALL-TOOLS.md
 	cd $(DIST) && ( command -v sha256sum >/dev/null 2>&1 && sha256sum *.zip || shasum -a 256 *.zip ) > SHA256SUMS
 	@echo "packaged $(VERSION) into $(DIST)/"
 

@@ -97,7 +97,7 @@ make package    # 承上，另外把各平台打包成 zip 並寫出 dist/SHA256
 | `nrf-factory-windows-amd64.exe` | Windows 10/11 x64（主目標） |
 | `nrf-factory-darwin-arm64` | macOS Apple Silicon |
 
-`make package` 會為每個平台產出 `dist/nrf-factory-<version>-<os>-<arch>.zip`（內含執行檔、README、docs/INSTALL-TOOLS.md，mac 平台再加 `exec.command`），以及對應的 `dist/SHA256SUMS`。
+`make package` 會為每個平台產出 `dist/nrf-factory-<version>-<os>-<arch>.zip`（內含 `dist/` 執行檔、README、docs/INSTALL-TOOLS.md），以及對應的 `dist/SHA256SUMS`。
 
 建置會用 `-ldflags -X` 把版本注入執行檔（`main.version` / `main.commit` / `main.date`），版本字串取自 `git describe --tags --always --dirty`；執行 `<binary> -version` 會印出目前版本。
 
@@ -120,9 +120,9 @@ GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w" \
 | 平台 | 動作 |
 |------|------|
 | Windows | 進 `dist/` 資料夾，檔案總管雙擊 `nrf-factory-windows-amd64.exe` |
-| macOS | Finder 雙擊 `exec.command`（開終端機並跑 `dist/` 內執行檔） |
+| macOS | Finder 雙擊 `dist/nrf-factory-darwin-arm64`（Unix 執行檔，Finder 會用終端機執行；首次被 Gatekeeper 擋時見下方） |
 
-> release zip 解壓後的結構與 `make dist` 完全一致：執行檔在 `dist/`，`exec.command` 與文件在根層。因此本節所有 `dist/…` 路徑在「解壓的 release zip」與「從原始碼建置」兩種情境都適用。
+> release zip 解壓後的結構與 `make dist` 完全一致：執行檔在 `dist/`，文件在根層。因此本節所有 `dist/…` 路徑在「解壓的 release zip」與「從原始碼建置」兩種情境都適用。
 
 或在終端直接跑：
 
