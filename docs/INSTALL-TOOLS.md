@@ -11,9 +11,16 @@ nRF Factory **不內嵌、不重散布** Nordic / SEGGER 軟體（各有授權�
 |------|------|------|
 | nRF Util（core） | **8.2.0**（commit `c910332`，2026-04-21） | `nrfutil --version` |
 | nRF Util **device** command | **2.19.1**（commit `181e493`，2026-06-03） | `nrfutil device --version` |
-| SEGGER J-Link Software | **V9.60**（DLL V9.60，Compiled Jul 15 2026） | `JLinkExe` 啟動 banner；安裝目錄常見 `JLink_V960` |
+| SEGGER J-Link Software | tested **V9.24a**（device 2.19.1 對應）；本機另裝 **V9.60** 亦實測可跑 | `JLinkExe` 啟動 banner；安裝目錄常見 `JLink_V9xx` |
 
-`nrfutil device --version` 會提示：device **官方測試**過的 J-Link 是 **V9.24a**，本機為 **V9.60**。提示寫明 tested 版非必須；本機實測 list / program 正常。若現場出現 J-Link 相關異常，可改裝 V9.24a 對照。
+**J-Link 目標版本以 nrfutil 官方輸出為準，不是某台機器現裝版。** device 2.19.1 對應的 tested 版為 **V9.24a**，用官方指令取得（機器無關）：
+
+```bash
+nrfutil device --version        # 文字同時印 tested 與本機現裝
+nrfutil device --version --json | jq -r '.. | objects | select(.name=="JlinkARM") | .expectedVersion.version'
+```
+
+tested 版**非強制**：較新版（本機 V9.60 已實測 list / program 正常）通常照跑；只有出現 J-Link 相關異常，才切回 tested 版 V9.24a。
 
 nRF Factory 右上狀態列成功時類似：
 
@@ -53,7 +60,7 @@ nrfutil-device 2.19.1 …
 
 - 下載總覽：[SEGGER J-Link downloads](https://www.segger.com/downloads/jlink/)
 - 接受 SEGGER 授權後下載 **Software and Documentation Pack**
-- 鎖定產線版本：**V9.60**（安裝後應出現 JLink_V960 / banner `V9.60`）
+- 版本以 nrfutil 報的 tested 版為準（device 2.19.1 → **V9.24a**）；較新版（如本機 **V9.60**，banner `V9.60`）通常可用，異常時切回 tested 版
 
 | 平台 | 安裝後應能在 PATH 找到 |
 |------|------------------------|
@@ -88,13 +95,13 @@ JLink
 通過條件：
 
 1. core / device 版本與上表一致或可接受（建議先對齊 8.2.0 + device 2.19.1）。
-2. J-Link banner 為 **V9.60**（或經核准的替代版）。
+2. J-Link 為 nrfutil tested 版（device 2.19.1 → **V9.24a**）或經實測可用的較新版（如 V9.60）。
 3. `device list` 在只接**一顆** probe 時可列出該 J-Link（serial 非空、`jlink: true`）。
 4. 啟動 nRF Factory 後右上 **綠燈** + 三項字串。
 
 ## Windows 10 / 11 產線建議順序
 
-1. 安裝 **J-Link Software Pack V9.60**（SEGGER 官網）→ 確認 PATH。
+1. 安裝 **J-Link Software Pack**（版本對 `nrfutil device --version` 報的 tested 版，device 2.19.1 → **V9.24a**；較新版通常亦可）→ 確認 PATH。
 2. 安裝 **nRF Util**（Nordic 官網）→ `nrfutil install device` → 核對 8.2.0 / 2.19.1。
 3. 接一顆 J-Link → `nrfutil device list --traits jlink`。
 4. 放置 `nrf-factory-windows-amd64.exe`（及韌體 `.hex`，外部選取）。
@@ -118,7 +125,7 @@ nrfutil / J-Link **無法**由 nRF Factory 一鍵代裝（授權與重散布限�
 |------|------|
 | 現場 nrfutil 比 8.2.0 新，device 也新 | 先在備援機跑通 list/program 再換產線；通過則更新本文件版本列 |
 | 現場只有舊 nrfutil | 升到 8.2.x + device 2.19.1 再燒 |
-| J-Link 不是 9.60 | 優先改裝 9.60；異常時對照 device 提示的 **9.24a** |
+| J-Link 版本疑慮 | 以 `nrfutil device --version` 報的 tested 版為準（現 **V9.24a**）；較新版通常可用，異常時改裝 tested 版 |
 | 多顆 J-Link | 拔到只剩一顆（本程式第一版不選 serial） |
 
 **不要**把 nrfutil / J-Link 安裝包 commit 進本 git 倉庫（體積、授權、資安）。  

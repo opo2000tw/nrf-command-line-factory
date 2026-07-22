@@ -35,10 +35,10 @@ tel. 886-4-22312859 · fax. 886-4-22362118
 程式本身**不附帶** Nordic / SEGGER 工具，工站需先裝好。  
 **固定版本與官方下載步驟**見 **[docs/INSTALL-TOOLS.md](docs/INSTALL-TOOLS.md)**（對齊本開發機已驗證組合）。
 
-| 項目 | 本機已驗證版本 | 用途 |
-|------|----------------|------|
+| 項目 | 版本 | 用途 |
+|------|------|------|
 | [nRF Util](https://www.nordicsemi.com/Products/Development-tools/nRF-Util) + `nrfutil install device` | core **8.2.0** · device **2.19.1** | 列舉與燒錄 |
-| [SEGGER J-Link Software](https://www.segger.com/downloads/jlink/) | **V9.60** | probe 驅動；`JLinkExe` / `JLink` 在 `PATH` |
+| [SEGGER J-Link Software](https://www.segger.com/downloads/jlink/) | **依 nrfutil 報的 tested 版**（device 2.19.1 對應 **V9.24a**；取法見下節，勿以某台機器現裝版為準） | probe 驅動；`JLinkExe` / `JLink` 在 `PATH` |
 | USB **剛好一顆** J-Link | — | 0 顆或多顆都會在燒錄時報錯 |
 
 可選：`NRFUTIL_PATH` 指向 `nrfutil` 完整路徑。
@@ -48,6 +48,40 @@ nrfutil --version
 nrfutil device --version
 nrfutil device list --traits jlink --json
 ```
+
+### nRF Util 元件與版本
+
+nrfutil 是分層的：core 只是 launcher，實際燒錄由 `device` 子命令做，J-Link 又是另一包 SEGGER 軟體。三者版本各自獨立。
+
+| 元件 | 現行版本 | 查版指令 | 角色 |
+|------|----------|----------|------|
+| nrfutil core | 8.2.0 | `nrfutil --version` | launcher；只負責裝／升子命令，不碰 probe |
+| nrfutil device | 2.19.1 | `nrfutil device --version` | 載入 J-Link DLL、真正燒錄 |
+| J-Link（tested） | V9.24a | 見下方官方取值 | device 命令**被測試對應**的 SEGGER 版 |
+
+**J-Link 該裝哪版：以 nrfutil 官方輸出報的 tested 版為準，不是某台機器剛好裝的版本。** 這個版本綁在 device 命令上，升 device 後可能改變：
+
+```bash
+# 人類可讀：印 Detected（本機現裝）與 tested（對應）兩個版本
+nrfutil device --version
+
+# 只取「對應的 J-Link 版本」（機器無關、可腳本化）
+nrfutil device --version --json \
+  | jq -r '.. | objects | select(.name=="JlinkARM") | .expectedVersion.version'
+# → JLink_V9.24a   （對應 device 2.19.1）
+```
+
+nrfutil 會註明 tested 版**非強制**：裝較新的 J-Link 通常照跑；只有遇到 J-Link 相關異常，才建議切回 tested 版（現為 V9.24a）。
+
+**版本管理指令**
+
+| 指令 | 作用 |
+|------|------|
+| `nrfutil list` | 列出已安裝子命令與版本 |
+| `nrfutil search` | 列出可安裝子命令 |
+| `nrfutil install device` | 安裝 device；可指定版本 `nrfutil install device=2.19.1`（`name[=version]`） |
+| `nrfutil upgrade` / `nrfutil upgrade device` | 升級全部／指定子命令到最新 |
+| `nrfutil self-upgrade` | 升級 core；`--to-version 8.2.0` 可指定或降回特定 core 版 |
 
 ### 取得執行檔
 
