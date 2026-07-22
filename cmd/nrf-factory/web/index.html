@@ -533,7 +533,9 @@
       serverOnline = false;
       toolStatus.classList.remove("ready");
       toolMessage.textContent = message || "本機服務已停止";
-      refreshFlashButton();
+      // Server-dependent actions must lock offline too, not just flash; setBusy
+      // re-applies reset/install disabled state against the new serverOnline.
+      setBusy(busy);
     }
 
     function renderState(state) {
