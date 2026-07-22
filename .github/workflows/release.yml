@@ -21,6 +21,21 @@ jobs:
         run: go test ./...
       - name: package
         run: make package VERSION=${{ github.ref_name }}
+      - name: verify checksums
+        run: cd dist && sha256sum -c SHA256SUMS
+      - name: verify package contents
+        run: |
+          windows_zip="dist/nrf-factory-${{ github.ref_name }}-windows-amd64.zip"
+          macos_zip="dist/nrf-factory-${{ github.ref_name }}-darwin-arm64.zip"
+          windows_listing="$(unzip -l "$windows_zip")"
+          macos_listing="$(unzip -l "$macos_zip")"
+          for expected in dist/nrf-factory-windows-amd64.exe 3rd/nrfutil.exe CHANGELOG.md docs/INSTALL-AND-RUN.md; do
+            awk -v expected="$expected" '$NF == expected { found=1 } END { exit !found }' <<<"$windows_listing"
+          done
+          for expected in dist/nrf-factory-darwin-arm64 3rd/nrfutil CHANGELOG.md docs/INSTALL-AND-RUN.md; do
+            awk -v expected="$expected" '$NF == expected { found=1 } END { exit !found }' <<<"$macos_listing"
+          done
+          # TODO: 執行檔 smoke 需 OS 相符的 macos/windows runner
       - name: create release
         env:
           GH_TOKEN: ${{ github.token }}
