@@ -545,6 +545,8 @@
       toolMessage.textContent = state.toolMessage;
       if (state.command && state.command !== "nrfutil") {
         toolFileName.textContent = state.command.split(/[\\/]/).pop();
+        const bundled = /(^|[\\/])3rd[\\/]/.test(state.command);
+        document.querySelector("#toolFileHint").textContent = bundled ? "使用內附 nrfutil（3rd/）" : state.command;
       }
       const appVersion = document.querySelector("#appVersion");
       if (appVersion) appVersion.textContent = state.version || "—";

@@ -18,4 +18,7 @@
 *.png binary
 *.syso binary
 *.uf2 binary
+
+# Bundled third-party tools (nrfutil) are binaries; never normalize.
+3rd/** binary
 *.zip binary

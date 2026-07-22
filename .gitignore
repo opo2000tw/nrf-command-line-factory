@@ -5,6 +5,9 @@
 *.so
 *.dylib
 
+# Bundled nrfutil ships inside the release zips; keep it despite *.exe above.
+!3rd/nrfutil.exe
+
 # Test and coverage artifacts
 *.test
 *.out

@@ -734,6 +734,65 @@ func openBrowser(url string) error {
 	return cmd.Start()
 }
 
+// nrfutilBinaryName is the bundled nrfutil filename for this OS.
+func nrfutilBinaryName() string {
+	if runtime.GOOS == "windows" {
+		return "nrfutil.exe"
+	}
+	return "nrfutil"
+}
+
+// bundledNRFUtilDirs lists directories that may hold a bundled nrfutil under a
+// 3rd/ folder shipped with the release (next to the executable) or the working
+// directory.
+func bundledNRFUtilDirs() []string {
+	var dirs []string
+	if exe, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exe)
+		dirs = append(dirs, filepath.Join(exeDir, "3rd"), filepath.Join(exeDir, "..", "3rd"))
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		dirs = append(dirs, filepath.Join(cwd, "3rd"))
+	}
+	return dirs
+}
+
+// findBundledNRFUtil returns the first bundled nrfutil executable found in dirs.
+func findBundledNRFUtil(dirs []string) (string, bool) {
+	name := nrfutilBinaryName()
+	for _, dir := range dirs {
+		path := filepath.Join(dir, name)
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return path, true
+		}
+	}
+	return "", false
+}
+
+// resolveNRFUtil picks the nrfutil to use: an explicit NRFUTIL_PATH, then the
+// bundled 3rd/ copy shipped with the release, then plain "nrfutil" on PATH.
+func resolveNRFUtil() string {
+	if path := strings.TrimSpace(os.Getenv("NRFUTIL_PATH")); path != "" {
+		return path
+	}
+	if path, ok := findBundledNRFUtil(bundledNRFUtilDirs()); ok {
+		prepareBundled(path)
+		return path
+	}
+	return "nrfutil"
+}
+
+// prepareBundled makes a bundled tool runnable. Zipping can drop the exec bit,
+// and a downloaded macOS copy carries com.apple.quarantine which Gatekeeper
+// blocks; clearing it here spares the operator a manual "allow" step. Both are
+// best-effort.
+func prepareBundled(path string) {
+	_ = os.Chmod(path, 0o755)
+	if runtime.GOOS == "darwin" {
+		_ = exec.Command("xattr", "-d", "com.apple.quarantine", path).Run()
+	}
+}
+
 func main() {
 	noBrowser := flag.Bool("no-browser", false, "serve only; do not launch a browser")
 	showVersion := flag.Bool("version", false, "print version and exit")
@@ -746,10 +805,7 @@ func main() {
 		return
 	}
 
-	command := strings.TrimSpace(os.Getenv("NRFUTIL_PATH"))
-	if command == "" {
-		command = "nrfutil"
-	}
+	command := resolveNRFUtil()
 	ready, message := preflight(command)
 	application := newApp(command, execCommand, ready, message)
 

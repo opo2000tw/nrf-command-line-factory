@@ -11,6 +11,8 @@ nRF Factory 執行檔本身**不內嵌** Nordic / SEGGER 工具（授權限制�
 
 ## A. 安裝 toolchain
 
+> nrfutil 已內附於 release（`3rd/nrfutil` / `3rd/nrfutil.exe`），程式啟動會自動採用，通常**不需**手動安裝 nrfutil core。但仍需依 A.2 安裝 `device` 子命令（可用畫面上的「安裝 device 命令」按鈕），並依 A.3 安裝 SEGGER J-Link。若要改用自己的 nrfutil，設環境變數 `NRFUTIL_PATH` 或用畫面上的選取項目指定。
+
 ### A.1 已驗證版本
 
 下列版本為本專案開發機（macOS arm64）實測可用組合，作為工站安裝對齊基準：

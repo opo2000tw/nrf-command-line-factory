@@ -2,7 +2,10 @@
 
 本專案採 SemVer；git tag 慣例 `vMAJOR.MINOR.PATCH`。版號與 bump 規則見 `tickets/release-01-versioning-policy.md`。
 
-## [Unreleased]
+## [0.1.2]
+
+### Added
+- 內附 nrfutil：release zip 依平台附上 `3rd/nrfutil`（macOS）/ `3rd/nrfutil.exe`（Windows），程式啟動自動採用（優先序 `NRFUTIL_PATH` > 內附 `3rd/` > PATH），macOS 並自動清除 quarantine 與補上執行權限；工站不必另裝或手動指定 nrfutil core。UI 的 nRF Util 選取項目會標示使用內附版本。
 
 ### Fixed
 - J-Link 偵測改為同時掃 SEGGER 標準安裝路徑（Windows `C:\Program Files\SEGGER\JLink[_V*]`、macOS `/Applications/SEGGER/JLink*`）與 PATH：安裝 J-Link 後不必手動設 PATH 即可轉綠。缺 J-Link 時的訊息會附上 nrfutil 回報的 tested 版，指出該裝哪一版。

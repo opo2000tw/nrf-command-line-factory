@@ -189,6 +189,25 @@ func TestProbeJLink(t *testing.T) {
 	}
 }
 
+func TestFindBundledNRFUtil(t *testing.T) {
+	root := t.TempDir()
+	thirdDir := filepath.Join(root, "3rd")
+	if err := os.MkdirAll(thirdDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := findBundledNRFUtil([]string{thirdDir}); ok {
+		t.Fatal("expected no bundled nrfutil before it exists")
+	}
+	bin := filepath.Join(thirdDir, nrfutilBinaryName())
+	if err := os.WriteFile(bin, []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := findBundledNRFUtil([]string{thirdDir})
+	if !ok || got != bin {
+		t.Fatalf("findBundledNRFUtil = %q, %v; want %q, true", got, ok, bin)
+	}
+}
+
 func flashRequest(t *testing.T, side, filename, content string) *http.Request {
 	t.Helper()
 	var body bytes.Buffer
