@@ -27,8 +27,10 @@ import (
 )
 
 const (
-	maxUploadBytes = 64 << 20
-	flashTimeout   = 5 * time.Minute
+	maxUploadBytes  = 64 << 20
+	toolUploadBytes = 128 << 20
+	flashTimeout    = 5 * time.Minute
+	installTimeout  = 10 * time.Minute
 )
 
 //go:embed web/index.html
@@ -43,6 +45,7 @@ type app struct {
 	busy        bool
 	command     string
 	run         commandRunner
+	probe       func(string) (bool, string)
 	toolReady   bool
 	toolMessage string
 }
@@ -53,6 +56,7 @@ type snapshot struct {
 	Busy        bool   `json:"busy"`
 	ToolReady   bool   `json:"toolReady"`
 	ToolMessage string `json:"toolMessage"`
+	Command     string `json:"command"`
 }
 
 type apiEvent struct {
@@ -67,6 +71,7 @@ func newApp(command string, run commandRunner, ready bool, message string) *app 
 	return &app{
 		command:     command,
 		run:         run,
+		probe:       preflight,
 		toolReady:   ready,
 		toolMessage: message,
 	}
@@ -78,6 +83,8 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("/api/state", a.handleState)
 	mux.HandleFunc("/api/reset", a.handleReset)
 	mux.HandleFunc("/api/flash", a.handleFlash)
+	mux.HandleFunc("/api/tool", a.handleTool)
+	mux.HandleFunc("/api/install-device", a.handleInstallDevice)
 	return mux
 }
 
@@ -219,10 +226,119 @@ func (a *app) handleFlash(w http.ResponseWriter, r *http.Request) {
 	_ = stream.event("error", message, true, false, &state)
 }
 
+// handleTool accepts an uploaded nrfutil executable, stores it, points the app
+// at it, and re-runs preflight so the status reflects the new tool.
+func (a *app) handleTool(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if !a.beginFlash() {
+		writeError(w, http.StatusConflict, "工作進行中，無法設定工具")
+		return
+	}
+	defer a.clearBusy()
+
+	r.Body = http.MaxBytesReader(w, r.Body, toolUploadBytes)
+	if err := r.ParseMultipartForm(toolUploadBytes); err != nil {
+		writeError(w, http.StatusBadRequest, "上傳失敗或檔案過大")
+		return
+	}
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
+	}
+
+	file, header, err := r.FormFile("tool")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "請選擇 nrfutil 執行檔")
+		return
+	}
+	defer file.Close()
+
+	path, err := saveToolBinary(file, header)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "無法儲存 nrfutil 執行檔")
+		return
+	}
+
+	ready, message := a.probe(path)
+	a.mu.Lock()
+	a.command = path
+	a.toolReady = ready
+	a.toolMessage = message
+	a.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, a.currentSnapshot())
+}
+
+// handleInstallDevice streams `nrfutil install device` to the client and
+// re-runs preflight when it finishes.
+func (a *app) handleInstallDevice(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if !a.beginFlash() {
+		writeError(w, http.StatusConflict, "已有工作進行中")
+		return
+	}
+
+	command := a.currentCommand()
+	stream := newEventWriter(w)
+	_ = stream.event("info", "安裝 nrfutil device 命令…", false, false, nil)
+
+	ctx, cancel := context.WithTimeout(r.Context(), installTimeout)
+	defer cancel()
+	runErr := a.run(ctx, command, []string{"install", "device"}, stream)
+	_ = stream.flushPending()
+
+	ready, message := a.probe(command)
+	a.mu.Lock()
+	a.toolReady = ready
+	a.toolMessage = message
+	a.busy = false
+	a.mu.Unlock()
+	state := a.currentSnapshot()
+
+	if runErr == nil {
+		_ = stream.event("success", "device 命令安裝完成", true, true, &state)
+		return
+	}
+	message = "安裝失敗：" + runErr.Error()
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		message = "安裝逾時"
+	}
+	_ = stream.event("error", message, true, false, &state)
+}
+
+func saveToolBinary(file io.Reader, header *multipart.FileHeader) (string, error) {
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if runtime.GOOS == "windows" && ext == "" {
+		ext = ".exe"
+	}
+	path := filepath.Join(os.TempDir(), "nrf-factory-nrfutil"+ext)
+	out, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o755)
+	if err != nil {
+		return "", err
+	}
+	if _, err := io.Copy(out, file); err != nil {
+		_ = out.Close()
+		return "", err
+	}
+	if err := out.Close(); err != nil {
+		return "", err
+	}
+	_ = os.Chmod(path, 0o755)
+	return path, nil
+}
+
 func (a *app) program(ctx context.Context, output io.Writer, firmwarePath string) error {
+	command := a.currentCommand()
 	var discovery bytes.Buffer
 	listArgs := []string{"device", "list", "--traits", "jlink", "--json"}
-	if err := a.run(ctx, a.command, listArgs, &discovery); err != nil {
+	if err := a.run(ctx, command, listArgs, &discovery); err != nil {
 		detail := strings.TrimSpace(discovery.String())
 		if detail == "" {
 			return fmt.Errorf("無法列舉 J-Link: %w", err)
@@ -249,7 +365,7 @@ func (a *app) program(ctx context.Context, output io.Writer, firmwarePath string
 		"--firmware", firmwarePath,
 		"--options", "chip_erase_mode=ERASE_RANGES_TOUCHED_BY_FIRMWARE,verify=VERIFY_READ,reset=RESET_SYSTEM",
 	}
-	if err := a.run(ctx, a.command, args, output); err != nil {
+	if err := a.run(ctx, command, args, output); err != nil {
 		return fmt.Errorf("nrfutil program: %w", err)
 	}
 	return nil
@@ -285,6 +401,18 @@ func (a *app) isBusy() bool {
 	return a.busy
 }
 
+func (a *app) clearBusy() {
+	a.mu.Lock()
+	a.busy = false
+	a.mu.Unlock()
+}
+
+func (a *app) currentCommand() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.command
+}
+
 func (a *app) currentSnapshot() snapshot {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -294,6 +422,7 @@ func (a *app) currentSnapshot() snapshot {
 		Busy:        a.busy,
 		ToolReady:   a.toolReady,
 		ToolMessage: a.toolMessage,
+		Command:     a.command,
 	}
 }
 

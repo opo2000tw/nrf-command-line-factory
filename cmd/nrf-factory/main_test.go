@@ -223,3 +223,92 @@ func indexOf(values []string, target string) int {
 	}
 	return -1
 }
+
+func TestInstallDeviceStreamsAndRefreshes(t *testing.T) {
+	var gotArgs []string
+	runner := func(_ context.Context, _ string, args []string, output io.Writer) error {
+		gotArgs = append([]string(nil), args...)
+		_, _ = io.WriteString(output, "Installing device\nDone\n")
+		return nil
+	}
+	application := newApp("nrfutil", runner, false, "缺 device command")
+	application.probe = func(string) (bool, string) { return true, "nrfutil ok · device ok" }
+
+	recorder := httptest.NewRecorder()
+	application.handleInstallDevice(recorder, httptest.NewRequest(http.MethodPost, "/api/install-device", nil))
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	if !reflect.DeepEqual(gotArgs, []string{"install", "device"}) {
+		t.Fatalf("args = %v", gotArgs)
+	}
+	events := decodeEvents(t, recorder.Body.Bytes())
+	last := events[len(events)-1]
+	if !last.Done || !last.Success || last.Level != "success" {
+		t.Fatalf("last event = %+v", last)
+	}
+	if last.State == nil || !last.State.ToolReady || last.State.Busy {
+		t.Fatalf("state = %+v", last.State)
+	}
+}
+
+func TestInstallDeviceFailureReportsError(t *testing.T) {
+	runner := func(_ context.Context, _ string, _ []string, output io.Writer) error {
+		_, _ = io.WriteString(output, "network error\n")
+		return errors.New("exit status 1")
+	}
+	application := newApp("nrfutil", runner, false, "缺 device command")
+	application.probe = func(string) (bool, string) { return false, "仍缺 device command" }
+
+	recorder := httptest.NewRecorder()
+	application.handleInstallDevice(recorder, httptest.NewRequest(http.MethodPost, "/api/install-device", nil))
+
+	events := decodeEvents(t, recorder.Body.Bytes())
+	last := events[len(events)-1]
+	if !last.Done || last.Success || last.Level != "error" {
+		t.Fatalf("last event = %+v", last)
+	}
+	if last.State == nil || last.State.ToolReady || last.State.Busy {
+		t.Fatalf("state = %+v", last.State)
+	}
+}
+
+func TestToolUploadSetsCommand(t *testing.T) {
+	application := newApp("nrfutil", nil, false, "找不到 nrfutil")
+	var probed string
+	application.probe = func(path string) (bool, string) { probed = path; return true, "工具就緒" }
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("tool", "nrfutil.exe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(part, "fake-binary"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/api/tool", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	recorder := httptest.NewRecorder()
+	application.handleTool(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	var state snapshot
+	if err := json.Unmarshal(recorder.Body.Bytes(), &state); err != nil {
+		t.Fatal(err)
+	}
+	if !state.ToolReady || !strings.HasSuffix(state.Command, "nrf-factory-nrfutil.exe") {
+		t.Fatalf("state = %+v", state)
+	}
+	if probed != state.Command {
+		t.Fatalf("probed %q != command %q", probed, state.Command)
+	}
+	_ = os.Remove(state.Command)
+}

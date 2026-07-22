@@ -313,6 +313,18 @@
       opacity: 0.42;
     }
 
+    .tool-setup {
+      margin-top: 30px;
+      padding-top: 22px;
+      border-top: 1px solid var(--line);
+    }
+
+    .tool-install {
+      width: 100%;
+      margin-top: 10px;
+      min-height: 46px;
+    }
+
     .console-panel {
       min-width: 0;
       display: flex;
@@ -452,6 +464,19 @@
           <button id="flashButton" class="primary" type="button" disabled>開始燒錄 L</button>
           <button id="resetButton" class="secondary" type="button">清除計數</button>
         </div>
+
+        <div class="tool-setup">
+          <span class="label">nRF Util</span>
+          <label class="file-drop" for="toolFile">
+            <input id="toolFile" name="tool" type="file">
+            <span class="file-tag" aria-hidden="true">EXE</span>
+            <span class="file-copy">
+              <strong id="toolFileName">指定 nrfutil 執行檔</strong>
+              <span id="toolFileHint">選 nrfutil（Windows 為 nrfutil.exe）；不在 PATH 時用這裡指定</span>
+            </span>
+          </label>
+          <button id="installButton" class="secondary tool-install" type="button">安裝 device 命令</button>
+        </div>
       </section>
 
       <section class="console-panel" aria-labelledby="consoleTitle">
@@ -480,6 +505,9 @@
     const stations = [...document.querySelectorAll(".station")];
     const toolStatus = document.querySelector("#toolStatus");
     const toolMessage = document.querySelector("#toolMessage");
+    const toolFile = document.querySelector("#toolFile");
+    const toolFileName = document.querySelector("#toolFileName");
+    const installButton = document.querySelector("#installButton");
     let selectedSide = "L";
     let busy = false;
     let serverOnline = false;
@@ -515,6 +543,9 @@
       document.querySelector("#rightCount").textContent = state.rightCount;
       toolStatus.classList.toggle("ready", state.toolReady);
       toolMessage.textContent = state.toolMessage;
+      if (state.command && state.command !== "nrfutil") {
+        toolFileName.textContent = state.command.split(/[\\/]/).pop();
+      }
       setBusy(state.busy);
     }
 
@@ -523,6 +554,8 @@
       document.body.classList.toggle("busy", busy);
       firmwareInput.disabled = busy;
       resetButton.disabled = busy || !serverOnline;
+      toolFile.disabled = busy;
+      installButton.disabled = busy || !serverOnline;
       stations.forEach(button => button.disabled = busy);
       refreshFlashButton();
     }
@@ -612,6 +645,60 @@
         } catch (_) {
           markOffline("本機服務已停止");
         }
+      }
+    });
+
+    toolFile.addEventListener("change", async () => {
+      const file = toolFile.files[0];
+      if (!file || busy) return;
+      toolFileName.textContent = file.name;
+      appendLog(`指定 nrfutil：${file.name}，驗證中…`);
+      setBusy(true);
+
+      const form = new FormData();
+      form.append("tool", file, file.name);
+      try {
+        const response = await fetch("/api/tool", { method: "POST", body: form });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        renderState(result);
+        appendLog(result.toolReady ? `工具就緒：${result.toolMessage}` : `仍缺：${result.toolMessage}`, result.toolReady ? "success" : "error");
+      } catch (error) {
+        appendLog(networkHint(error), "error");
+        try {
+          await pingServer();
+        } catch (_) {
+          markOffline("本機服務已停止");
+        }
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    installButton.addEventListener("click", async () => {
+      if (busy) return;
+      appendLog("開始安裝 nrfutil device 命令…（下載需一點時間）");
+      setBusy(true);
+      try {
+        const response = await fetch("/api/install-device", { method: "POST" });
+        if (!response.ok) {
+          let message = `HTTP ${response.status}`;
+          try {
+            const problem = await response.json();
+            if (problem.error) message = problem.error;
+          } catch (_) { /* non-JSON error body */ }
+          throw new Error(message);
+        }
+        await readEvents(response.body);
+      } catch (error) {
+        appendLog(networkHint(error), "error");
+        try {
+          await pingServer();
+        } catch (_) {
+          markOffline("本機服務已停止");
+        }
+      } finally {
+        setBusy(false);
       }
     });
 
