@@ -482,6 +482,7 @@
     const toolMessage = document.querySelector("#toolMessage");
     let selectedSide = "L";
     let busy = false;
+    let serverOnline = false;
 
     function appendLog(message, level = "info") {
       if (!message) return;
@@ -492,8 +493,24 @@
       terminal.scrollTop = terminal.scrollHeight;
     }
 
+    function networkHint(error) {
+      const raw = (error && error.message) || String(error || "");
+      if (/failed to fetch|networkerror|load failed|network request failed/i.test(raw)) {
+        return "連不上本機服務（Failed to fetch）。請執行 ./exec.sh status 檢查；若已停則 ./exec.sh 重開（port 每次不同，舊視窗會失效）。";
+      }
+      return raw || "未知錯誤";
+    }
+
+    function markOffline(message) {
+      serverOnline = false;
+      toolStatus.classList.remove("ready");
+      toolMessage.textContent = message || "本機服務已停止";
+      refreshFlashButton();
+    }
+
     function renderState(state) {
       if (!state) return;
+      serverOnline = true;
       document.querySelector("#leftCount").textContent = state.leftCount;
       document.querySelector("#rightCount").textContent = state.rightCount;
       toolStatus.classList.toggle("ready", state.toolReady);
@@ -505,14 +522,20 @@
       busy = value;
       document.body.classList.toggle("busy", busy);
       firmwareInput.disabled = busy;
-      resetButton.disabled = busy;
+      resetButton.disabled = busy || !serverOnline;
       stations.forEach(button => button.disabled = busy);
       refreshFlashButton();
     }
 
     function refreshFlashButton() {
       flashButton.textContent = busy ? `正在燒錄 ${selectedSide}` : `開始燒錄 ${selectedSide}`;
-      flashButton.disabled = busy || firmwareInput.files.length === 0;
+      flashButton.disabled = busy || !serverOnline || firmwareInput.files.length === 0;
+    }
+
+    async function pingServer() {
+      const response = await fetch("/api/state", { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      renderState(await response.json());
     }
 
     stations.forEach(button => {
@@ -539,6 +562,15 @@
       if (!file || busy) return;
 
       setBusy(true);
+      try {
+        await pingServer();
+      } catch (error) {
+        markOffline("本機服務已停止");
+        appendLog(networkHint(error), "error");
+        setBusy(false);
+        return;
+      }
+
       const form = new FormData();
       form.append("side", selectedSide);
       form.append("firmware", file, file.name);
@@ -546,12 +578,21 @@
       try {
         const response = await fetch("/api/flash", { method: "POST", body: form });
         if (!response.ok) {
-          const problem = await response.json();
-          throw new Error(problem.error || `HTTP ${response.status}`);
+          let message = `HTTP ${response.status}`;
+          try {
+            const problem = await response.json();
+            if (problem.error) message = problem.error;
+          } catch (_) { /* non-JSON error body */ }
+          throw new Error(message);
         }
         await readEvents(response.body);
       } catch (error) {
-        appendLog(error.message, "error");
+        appendLog(networkHint(error), "error");
+        try {
+          await pingServer();
+        } catch (_) {
+          markOffline("本機服務已停止");
+        }
       } finally {
         setBusy(false);
       }
@@ -565,7 +606,12 @@
         renderState(result);
         appendLog("L/R 成功計數已清除");
       } catch (error) {
-        appendLog(error.message, "error");
+        appendLog(networkHint(error), "error");
+        try {
+          await pingServer();
+        } catch (_) {
+          markOffline("本機服務已停止");
+        }
       }
     });
 
@@ -594,15 +640,19 @@
 
     async function loadState() {
       try {
-        const response = await fetch("/api/state");
-        renderState(await response.json());
+        await pingServer();
       } catch (error) {
-        toolMessage.textContent = "無法連線本機服務";
-        appendLog(error.message, "error");
+        markOffline("無法連線本機服務");
+        appendLog(networkHint(error), "error");
       }
     }
 
     loadState();
+    // Stale green status after the Go process dies is confusing; poll while idle.
+    setInterval(() => {
+      if (busy) return;
+      pingServer().catch(() => markOffline("本機服務已停止 — 請執行 ./exec.sh 重開"));
+    }, 3000);
   </script>
 </body>
 </html>

@@ -520,6 +520,8 @@ func openBrowser(url string) error {
 
 func main() {
 	noBrowser := flag.Bool("no-browser", false, "do not open the system browser")
+	// :0 = OS picks a free port. Prefer a fixed port for factory scripts (e.g. 127.0.0.1:17832).
+	addr := flag.String("addr", "127.0.0.1:0", "loopback listen address (host:port)")
 	flag.Parse()
 
 	command := strings.TrimSpace(os.Getenv("NRFUTIL_PATH"))
@@ -529,7 +531,11 @@ func main() {
 	ready, message := preflight(command)
 	application := newApp(command, execCommand, ready, message)
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listenAddr := strings.TrimSpace(*addr)
+	if listenAddr == "" {
+		listenAddr = "127.0.0.1:0"
+	}
+	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		log.Fatal(err)
 	}

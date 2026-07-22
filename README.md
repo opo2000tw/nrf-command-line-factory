@@ -82,6 +82,51 @@ GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-s -w" \
 
 ### 啟動
 
+#### 建議：app 視窗（Chrome / Edge `--app=`）
+
+不開一般瀏覽器分頁，改用獨立 app 視窗。預設固定 **`http://127.0.0.1:17832`**。
+
+**生命週期：關掉 app 視窗 = 停止 nRF Factory 服務**（獨立 Chrome profile，關最後一個窗就結束該 process，腳本接著 kill server）。
+
+```bash
+./exec.sh              # 起服務 + 開窗，擋在終端；關窗後自動 stop
+./exec.sh open         # 只重開窗（服務須已在跑；不接管生命週期）
+./exec.sh status
+./exec.sh stop         # 強制停服務（並試著關 app Chrome）
+```
+
+**雙擊啟動**
+
+| 檔案 | 平台 | 說明 |
+|------|------|------|
+| `exec.command` | macOS | Finder **雙擊**會開「終端機」並跑 `exec.sh`（`.sh` 本身雙擊通常不會執行） |
+| `exec.bat` | Windows | 檔案總管雙擊；有 Git Bash 時走完整 `exec.sh` session，否則直接開 `.exe` |
+
+第一次若 macOS 擋 `exec.command`：右鍵 → 打開，或：
+
+```bash
+chmod +x exec.command exec.sh scripts/browser-app.sh
+xattr -d com.apple.quarantine exec.command   # 若從下載/AirDrop 來
+```
+
+| 指令 / 變數 | 說明 |
+|-------------|------|
+| `./exec.sh` / `start` | session：起服務 → 開窗 → **關窗即停服務** |
+| `./exec.sh open` | 僅再開一個 app 窗 |
+| `./exec.sh stop` | 強制停止 |
+| `./exec.sh status` | pid / url |
+| `NRF_FACTORY_BIN` | 指定執行檔 |
+| `NRF_FACTORY_ADDR` | 預設 `127.0.0.1:17832` |
+| `.run/` | pid / url / log / chrome-profile（gitignore） |
+
+```bash
+NRF_FACTORY_BIN=./dist/nrf-factory-darwin-arm64 ./exec.sh
+```
+
+需已安裝 Chrome、Edge、Chromium 或 Brave 其一。
+
+#### 直接跑執行檔
+
 **Windows**
 
 ```text
@@ -91,22 +136,24 @@ nrf-factory-windows-amd64.exe
 **macOS**
 
 ```bash
-./nrf-factory-darwin-arm64          # Apple Silicon
+./dist/nrf-factory-darwin-arm64          # Apple Silicon
 # 或
-./nrf-factory-darwin-amd64          # Intel
+./dist/nrf-factory-darwin-amd64          # Intel
 ```
 
 行為：
 
 1. 綁定 `127.0.0.1` 隨機 port（不對外網開放）。
 2. 主控台印出 `nRF Factory: http://127.0.0.1:<port>`。
-3. 預設自動開系統瀏覽器；不要開瀏覽器時加 `-no-browser`。
+3. 預設自動開系統瀏覽器（一般分頁）；不要開瀏覽器時加 `-no-browser`。
 
 ```bash
-./nrf-factory-darwin-arm64 -no-browser
+./dist/nrf-factory-darwin-arm64 -no-browser
+# 另開 app 視窗：
+./scripts/browser-app.sh http://127.0.0.1:PORT
 ```
 
-關閉：在終端機 `Ctrl+C`（或結束該 process）。瀏覽器分頁關掉不會停服務。
+關閉服務：用 `./exec.sh` 時 **關掉 app 視窗** 即停；或 `./exec.sh stop` / 終端 `Ctrl+C`。直接前景跑 binary 時，在該終端 `Ctrl+C`。
 
 #### macOS Gatekeeper
 

@@ -17,6 +17,9 @@ profile.cov
 /dist/
 /nrf-factory
 
+# Runtime (detached ./exec.sh pid / url / log)
+/.run/
+
 # Local Go workspace and environment
 go.work
 go.work.sum
