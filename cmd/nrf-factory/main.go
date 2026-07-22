@@ -217,7 +217,9 @@ func (a *app) handleFlash(w http.ResponseWriter, r *http.Request) {
 	stream := newEventWriter(w)
 	_ = stream.event("info", fmt.Sprintf("%s 側：準備燒錄 %s", side, displayName), false, false, nil)
 
-	ctx, cancel := context.WithTimeout(r.Context(), flashTimeout)
+	// Hardware writes must finish once started. a.busy prevents re-entry,
+	// while the timeout still places an upper bound on the operation.
+	ctx, cancel := context.WithTimeout(context.Background(), flashTimeout)
 	defer cancel()
 	err = a.program(ctx, stream, tempPath)
 	_ = stream.flushPending()
@@ -299,7 +301,7 @@ func (a *app) handleInstallDevice(w http.ResponseWriter, r *http.Request) {
 	stream := newEventWriter(w)
 	_ = stream.event("info", "安裝 nrfutil device 命令…", false, false, nil)
 
-	ctx, cancel := context.WithTimeout(r.Context(), installTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), installTimeout)
 	defer cancel()
 	runErr := a.run(ctx, command, []string{"install", "device"}, stream)
 	_ = stream.flushPending()
@@ -865,6 +867,26 @@ func main() {
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Print(err)
 		}
+	}
+
+	if application.isBusy() {
+		fmt.Println("燒錄仍在進行，等待完成後才停止（再按一次 Ctrl+C 可強制停止）")
+		ticker := time.NewTicker(200 * time.Millisecond)
+		timeout := time.NewTimer(flashTimeout)
+	waitForFlash:
+		for application.isBusy() {
+			select {
+			case s := <-sigCh:
+				fmt.Printf("收到 %s，強制停止\n", s)
+				break waitForFlash
+			case <-ticker.C:
+			case <-timeout.C:
+				fmt.Println("等待燒錄完成逾時，強制停止")
+				break waitForFlash
+			}
+		}
+		ticker.Stop()
+		timeout.Stop()
 	}
 
 	session.kill()

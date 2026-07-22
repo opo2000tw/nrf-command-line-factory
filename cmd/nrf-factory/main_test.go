@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 const oneJLink = `{"type":"info","data":{"devices":[{"serialNumber":"000802009570","traits":{"jlink":true}}]}}` + "\n"
@@ -80,6 +81,96 @@ func TestFlashEndpointSuccess(t *testing.T) {
 	firmwareIndex := indexOf(programArgs, "--firmware")
 	if firmwareIndex < 0 || firmwareIndex+1 >= len(programArgs) || !strings.HasSuffix(programArgs[firmwareIndex+1], ".hex") {
 		t.Fatalf("missing temporary hex path in %v", programArgs)
+	}
+}
+
+func TestFlashProgrammingContinuesAfterRequestCancellation(t *testing.T) {
+	programStarted := make(chan struct{})
+	inspectContext := make(chan struct{})
+	waitingForRelease := make(chan struct{})
+	releaseProgram := make(chan struct{})
+	programResult := make(chan string, 1)
+	released := false
+	defer func() {
+		if !released {
+			close(releaseProgram)
+		}
+	}()
+
+	runner := func(ctx context.Context, _ string, args []string, output io.Writer) error {
+		switch args[1] {
+		case "list":
+			_, _ = io.WriteString(output, oneJLink)
+			return nil
+		case "program":
+			close(programStarted)
+			<-inspectContext
+			select {
+			case <-ctx.Done():
+				programResult <- "context canceled"
+				return ctx.Err()
+			default:
+			}
+			close(waitingForRelease)
+			select {
+			case <-ctx.Done():
+				programResult <- "context canceled"
+				return ctx.Err()
+			case <-releaseProgram:
+				programResult <- "released"
+				return nil
+			}
+		default:
+			return errors.New("unexpected command")
+		}
+	}
+	application := newApp("nrfutil", runner, true, "ready")
+
+	requestContext, cancelRequest := context.WithCancel(context.Background())
+	request := flashRequest(t, "L", "app.hex", ":00000001FF\n").WithContext(requestContext)
+	recorder := httptest.NewRecorder()
+	handlerDone := make(chan struct{})
+	go func() {
+		application.handleFlash(recorder, request)
+		close(handlerDone)
+	}()
+
+	select {
+	case <-programStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("program stage did not start")
+	}
+
+	cancelRequest()
+	close(inspectContext)
+	select {
+	case result := <-programResult:
+		t.Fatalf("program stopped before release: %s", result)
+	case <-waitingForRelease:
+	case <-time.After(2 * time.Second):
+		t.Fatal("program did not inspect its context")
+	}
+
+	close(releaseProgram)
+	released = true
+	select {
+	case result := <-programResult:
+		if result != "released" {
+			t.Fatalf("program result = %q, want released", result)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("program did not finish after release")
+	}
+	select {
+	case <-handlerDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("flash handler did not return")
+	}
+
+	events := decodeEvents(t, recorder.Body.Bytes())
+	last := events[len(events)-1]
+	if !last.Done || !last.Success || last.State == nil || last.State.LeftCount != 1 {
+		t.Fatalf("last event = %+v", last)
 	}
 }
 
