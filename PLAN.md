@@ -11,6 +11,7 @@
 - UI 以上傳方式送入外部 `.hex` 韌體；後端寫入權限受限的暫存檔，燒錄結束後刪除。
 - 燒錄後端使用 Nordic 現行的 `nrfutil device`，由 `os/exec.CommandContext` 直接傳入參數，不經 shell。合併 stdout/stderr 後串流到畫面。不得改用已淘汰的 `nrfjprog`。
 - `nrfutil`、`device` command 與 `SEGGER J-Link` 皆不嵌入（各帶 Nordic／SEGGER 授權，不由本程式重散布）；改為啟動時 preflight 偵測是否安裝，缺哪一項就在畫面明確顯示缺什麼與安裝指引。firmware 同樣不嵌入，runtime 由使用者外部選取。
+  - 注：v0.1.2 起 release zip 內附 `nrfutil`（`3rd/`）供開箱即用，與本節「不重散布」原則相左；授權重評與本文件對齊追蹤於 tickets/release-03。`nrfutil` 仍未編入執行檔，J-Link 與 firmware 維持外部。
 - 第一版只支援 J-Link 連接與 `.hex`。若偵測不到相容裝置或同時存在多個裝置，直接顯示錯誤，不先做裝置設定頁。
 - L/R 暫定為產品側別與計數分類，不映射不同 probe。若實際治具是雙 probe，再加入 serial number 對應。
 - TinyGo 不採用：它的 `flash` 流程面向「編譯指定 board target 的 Go 原始碼」，不是工廠端任意外部韌體燒錄器。

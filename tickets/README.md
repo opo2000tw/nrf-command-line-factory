@@ -1,6 +1,6 @@
 # Tickets 索引
 
-以下依 Build / Package / Release / Run 四個階段列出目前規劃的工作項目，狀態欄位反映各 ticket 檔案內的 `狀態` 欄位。
+以下依 Build / Package / Release / Run / Test / Security 階段列出目前規劃的工作項目，狀態欄位反映各 ticket 檔案內的 `狀態` 欄位。
 
 ## Build
 
@@ -24,6 +24,7 @@
 | --- | --- | --- | --- |
 | [release-01](release-01-versioning-policy.md) | 版號策略（SemVer + tag + CHANGELOG） | P1 | done |
 | [release-02](release-02-github-release.md) | GitHub Release 發布流程 | P1 | done |
+| [release-03](release-03-nrfutil-redistribution-license.md) | nrfutil 內附散布的授權確認與供應鏈 manifest | P1 | todo |
 
 ## Run
 
@@ -33,3 +34,16 @@
 | [run-02](run-02-fixed-port-single-instance.md) | 固定埠 single-instance 友善處理 | P3 | todo |
 | [run-03](run-03-persist-nrfutil-path.md) | nrfutil 路徑持久化 | P3 | todo |
 | [run-04](run-04-windows-console-close.md) | Windows 關 console 的 graceful shutdown | P3 | todo |
+
+## Test
+
+| ID | 標題 | 優先 | 狀態 |
+| --- | --- | --- | --- |
+| [test-01](test-01-playwright-functional.md) | Playwright UI 功能測試套件 | P1 | done |
+| [test-02](test-02-coverage-gaps.md) | 測試覆蓋缺口 | P2 | todo |
+
+## Security
+
+| ID | 標題 | 優先 | 狀態 |
+| --- | --- | --- | --- |
+| [security-01](security-01-loopback-hardening.md) | loopback server 與工具上傳的安全強化 | P1 | todo |

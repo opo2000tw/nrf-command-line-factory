@@ -220,7 +220,7 @@ xattr -d com.apple.quarantine nrf-factory-darwin-arm64
 
 - 只聽 loopback，不開對外 port。
 - 不提供 recover / 獨立 mass erase。
-- 不嵌入韌體、nrfutil、J-Link。
+- 不嵌入韌體、J-Link；nrfutil 不編入執行檔，但 release zip 內附 `3rd/` 版供開箱即用（授權評估見 tickets/release-03）。
 - 同時只允許一個燒錄工作。
 - L/R 是產品側別與計數，不是雙 probe 對應；若治具改雙 probe，需另做 serial 對應。
 
