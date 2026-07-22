@@ -106,14 +106,8 @@ test.describe("flash", () => {
   });
 
   test("busy lock: flash disables inputs mid-request, then releases on completion", async ({ page }) => {
-    const state = await gotoApp(page);
+    await gotoApp(page);
     await page.setInputFiles("#firmware", firmwareFile());
-
-    // The click handler pings GET /api/state BEFORE POSTing /api/flash, and
-    // renderState() unconditionally applies that ping's busy flag. Unless the
-    // live state already reports busy here, the ping would flip the UI back
-    // to unlocked while the (still in-flight) POST is gated below.
-    state.busy = true;
 
     const gate = makeGate();
     await page.route(FLASH_ROUTE, async (route) => {
@@ -127,7 +121,7 @@ test.describe("flash", () => {
             message: "L 側燒錄成功",
             done: true,
             success: true,
-            state: { ...state },
+            state: defaultState({ leftCount: 1 }),
           },
         ]),
       });
@@ -142,13 +136,52 @@ test.describe("flash", () => {
     await expect(page.locator('.station[data-side="L"]')).toBeDisabled();
     await expect(page.locator('.station[data-side="R"]')).toBeDisabled();
 
-    state.busy = false;
-    state.leftCount = 1;
     gate.open();
 
     await expect(page.locator("#leftCount")).toHaveText("1");
     await expect(page.locator("#flashButton")).toHaveText("開始燒錄 L");
+    await expect(page.locator("#flashButton")).toBeEnabled();
     await expect(page.locator("body")).not.toHaveClass(/busy/);
+  });
+
+  test("beforeunload is prevented only while a flash is in flight", async ({ page }) => {
+    await gotoApp(page);
+    await page.setInputFiles("#firmware", firmwareFile());
+
+    const dispatchBeforeUnload = () =>
+      page.evaluate(() => {
+        const event = new Event("beforeunload", { cancelable: true });
+        window.dispatchEvent(event);
+        return event.defaultPrevented;
+      });
+
+    expect(await dispatchBeforeUnload()).toBe(false);
+
+    const gate = makeGate();
+    await page.route(FLASH_ROUTE, async (route) => {
+      await gate.opened;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/x-ndjson; charset=utf-8",
+        body: ndjson([
+          {
+            level: "success",
+            message: "L 側燒錄成功",
+            done: true,
+            success: true,
+            state: defaultState({ leftCount: 1 }),
+          },
+        ]),
+      });
+    });
+
+    await page.locator("#flashButton").click();
+    await expect(page.locator("body")).toHaveClass(/busy/);
+    expect(await dispatchBeforeUnload()).toBe(true);
+
+    gate.open();
+    await expect(page.locator("body")).not.toHaveClass(/busy/);
+    expect(await dispatchBeforeUnload()).toBe(false);
   });
 
   test("aborted /api/flash request surfaces the offline network hint", async ({ page }) => {

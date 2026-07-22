@@ -112,8 +112,8 @@ export async function gotoApp(
 //            state: defaultState({ leftCount: 1 }) },
 //        ]),
 //      }));
-//    // NOTE: the flash handler pings GET /api/state BEFORE POSTing, so keep the
-//    // gotoApp state's busy=false (default) or the button stays disabled.
+//    // The flash handler re-locks the UI after its pre-POST state ping, so the
+//    // default server state (busy=false) still stays locked while POST is live.
 //
 //  Mock a rejected request (HTTP error path -> networkHint/appendLog):
 //    await page.route(RESET_ROUTE, (route) =>

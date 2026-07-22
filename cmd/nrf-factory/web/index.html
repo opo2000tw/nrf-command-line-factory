@@ -610,6 +610,9 @@
         return;
       }
 
+      // pingServer's renderState overwrites busy with the server's still-false
+      // value, so lock the UI again immediately before submitting the flash.
+      setBusy(true);
       const form = new FormData();
       form.append("side", selectedSide);
       form.append("firmware", file, file.name);
@@ -739,6 +742,12 @@
         appendLog(networkHint(error), "error");
       }
     }
+
+    window.addEventListener("beforeunload", (event) => {
+      if (!busy) return;
+      event.preventDefault();
+      event.returnValue = "";
+    });
 
     loadState();
     // Stale green status after the Go process dies is confusing; poll while idle.
