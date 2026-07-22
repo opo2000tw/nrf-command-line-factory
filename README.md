@@ -32,27 +32,22 @@ tel. 886-4-22312859 · fax. 886-4-22362118
 
 ### 工站前置條件
 
-程式本身**不附帶** Nordic / SEGGER 工具，工站需先裝好：
+程式本身**不附帶** Nordic / SEGGER 工具，工站需先裝好。  
+**固定版本與官方下載步驟**見 **[docs/INSTALL-TOOLS.md](docs/INSTALL-TOOLS.md)**（對齊本開發機已驗證組合）。
 
-| 項目 | 用途 | 安裝方式 |
-|------|------|----------|
-| [nRF Util](https://www.nordicsemi.com/Products/Development-tools/nRF-Util) | 裝置列舉與燒錄後端 | 依 Nordic 官方安裝後，再執行 `nrfutil install device` |
-| [SEGGER J-Link Software](https://www.segger.com/downloads/jlink/) | probe 驅動與 runtime | 安裝後確認 `JLinkExe`（macOS/Linux）或 `JLink`（Windows）在 `PATH` |
-| USB 接上 **剛好一顆** J-Link | 燒錄通道 | 0 顆或多顆都會在燒錄時直接報錯 |
+| 項目 | 本機已驗證版本 | 用途 |
+|------|----------------|------|
+| [nRF Util](https://www.nordicsemi.com/Products/Development-tools/nRF-Util) + `nrfutil install device` | core **8.2.0** · device **2.19.1** | 列舉與燒錄 |
+| [SEGGER J-Link Software](https://www.segger.com/downloads/jlink/) | **V9.60** | probe 驅動；`JLinkExe` / `JLink` 在 `PATH` |
+| USB **剛好一顆** J-Link | — | 0 顆或多顆都會在燒錄時報錯 |
 
-可選環境變數：
-
-- `NRFUTIL_PATH`：`nrfutil` 不在 `PATH` 時，指向完整路徑。
-
-命令列自檢（可選）：
+可選：`NRFUTIL_PATH` 指向 `nrfutil` 完整路徑。
 
 ```bash
 nrfutil --version
 nrfutil device --version
 nrfutil device list --traits jlink --json
 ```
-
-`device list` 應只看到一顆 `jlink: true` 的 probe。
 
 ### 取得執行檔
 
