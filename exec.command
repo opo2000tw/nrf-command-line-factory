@@ -3,13 +3,7 @@
 # Closing the app window (or Ctrl+C in this terminal) stops the service.
 cd "$(dirname "$0")" || exit 1
 
-BIN="${NRF_FACTORY_BIN:-}"
-if [[ -z "$BIN" ]]; then
-  case "$(uname -m)" in
-    arm64|aarch64) BIN="./dist/nrf-factory-darwin-arm64" ;;
-    *)             BIN="./dist/nrf-factory-darwin-amd64" ;;
-  esac
-fi
+BIN="${NRF_FACTORY_BIN:-./dist/nrf-factory-darwin-arm64}"
 
 chmod +x "$BIN" 2>/dev/null || true
 if [[ ! -x "$BIN" ]]; then

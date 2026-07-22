@@ -6,15 +6,15 @@
 
 | ID | 標題 | 優先 | 狀態 |
 | --- | --- | --- | --- |
-| [build-01](build-01-reproducible-build.md) | 可重現的多平台建置腳本 | P1 | todo |
-| [build-02](build-02-version-stamping.md) | 版本戳記嵌入執行檔 | P1 | todo |
+| [build-01](build-01-reproducible-build.md) | 可重現的多平台建置腳本 | P1 | done |
+| [build-02](build-02-version-stamping.md) | 版本戳記嵌入執行檔 | P1 | done |
 
 ## Package
 
 | ID | 標題 | 優先 | 狀態 |
 | --- | --- | --- | --- |
 | [package-01](package-01-windows-gui-subsystem.md) | Windows GUI subsystem 消除雙擊黑窗 | P2 | todo |
-| [package-02](package-02-release-bundles.md) | per-platform release bundle 與 checksum | P1 | todo |
+| [package-02](package-02-release-bundles.md) | per-platform release bundle 與 checksum | P1 | done |
 | [package-03](package-03-macos-gatekeeper.md) | macOS Gatekeeper / 簽章策略 | P3 | todo |
 | [package-04](package-04-windows-signing.md) | Windows 程式碼簽章 / SmartScreen | P2 | todo |
 
@@ -22,8 +22,8 @@
 
 | ID | 標題 | 優先 | 狀態 |
 | --- | --- | --- | --- |
-| [release-01](release-01-versioning-policy.md) | 版號策略（SemVer + tag + CHANGELOG） | P1 | todo |
-| [release-02](release-02-github-release.md) | GitHub Release 發布流程 | P1 | todo |
+| [release-01](release-01-versioning-policy.md) | 版號策略（SemVer + tag + CHANGELOG） | P1 | done |
+| [release-02](release-02-github-release.md) | GitHub Release 發布流程 | P1 | doing |
 
 ## Run
 

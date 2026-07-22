@@ -2,7 +2,7 @@
 
 工廠端 nRF 韌體燒錄桌面程式。啟動後在本機 `127.0.0.1` 開單一頁面，選外部 `.hex`、選 L/R、燒錄，並以彩色 log 與成功計數回報結果。
 
-主目標平台：**Windows 10 / 11 x64**。macOS（Apple Silicon / Intel）可作開發與驗證。
+主目標平台：**Windows 10 / 11 x64**。macOS（Apple Silicon）可作開發與驗證。
 
 ---
 
@@ -85,29 +85,31 @@ nrfutil 會註明 tested 版**非強制**：裝較新的 J-Link 通常照跑；�
 
 ### 取得執行檔
 
-`dist/` 不進版控（已 gitignore）。由本機交叉編譯產出，例如：
+`dist/` 不進版控（已 gitignore）。權威建置方式是 `Makefile`（在已安裝 Go 的機器上）：
+
+```bash
+make dist       # 交叉編譯 windows/amd64、darwin/arm64 到 dist/
+make package    # 承上，另外把各平台打包成 zip 並寫出 dist/SHA256SUMS
+```
 
 | 檔名 | 平台 |
 |------|------|
 | `nrf-factory-windows-amd64.exe` | Windows 10/11 x64（主目標） |
 | `nrf-factory-darwin-arm64` | macOS Apple Silicon |
-| `nrf-factory-darwin-amd64` | macOS Intel |
 
-自行建置（在已安裝 Go 的機器上）：
+`make package` 會為每個平台產出 `dist/nrf-factory-<version>-<os>-<arch>.zip`（內含執行檔、README、docs/INSTALL-TOOLS.md，mac 平台再加 `exec.command`），以及對應的 `dist/SHA256SUMS`。
+
+建置會用 `-ldflags -X` 把版本注入執行檔（`main.version` / `main.commit` / `main.date`），版本字串取自 `git describe --tags --always --dirty`；執行 `<binary> -version` 會印出目前版本。
+
+若不透過 Makefile、手動 `go build` 且未帶上述 `-ldflags`，版本會 fallback 顯示為 `dev`：
 
 ```bash
-# Windows x64（可在 macOS / Linux 交叉編譯，純 Go 無 cgo）
+# 手動單平台建置範例（fallback，非權威方式；正式建置請用 make dist / make package）
 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w" \
   -o dist/nrf-factory-windows-amd64.exe ./cmd/nrf-factory
-
-# macOS Apple Silicon
-GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "-s -w" \
-  -o dist/nrf-factory-darwin-arm64 ./cmd/nrf-factory
-
-# macOS Intel
-GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-s -w" \
-  -o dist/nrf-factory-darwin-amd64 ./cmd/nrf-factory
 ```
+
+推送 `v*` git tag 會觸發 GitHub Actions 的 Release workflow：自動建置、`make package`，並以 `gh release create` 附上各平台 zip 與 `SHA256SUMS`。版本規則與逐版變更見 [CHANGELOG.md](CHANGELOG.md)。
 
 ### 啟動
 
@@ -124,7 +126,6 @@ GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-s -w" \
 
 ```bash
 ./dist/nrf-factory-darwin-arm64          # macOS Apple Silicon
-./dist/nrf-factory-darwin-amd64          # macOS Intel
 ```
 
 啟動行為：
@@ -137,6 +138,7 @@ GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-s -w" \
 |-------------|------|
 | `-addr` | loopback 監聽位址，預設 `127.0.0.1:0`（隨機 port）；工廠可固定如 `127.0.0.1:17832` |
 | `-no-browser` | 只起服務、不開瀏覽器；用主控台印的網址自行開啟，Ctrl+C 停止 |
+| `-version` | 印出版本（`nRF Factory <version> (<commit>, built <date>)`）後結束程式，不開瀏覽器 |
 | `NRFUTIL_PATH` | `nrfutil` 不在 `PATH` 時指向完整路徑 |
 | `NRF_FACTORY_PROFILE` | 覆寫 app 視窗使用的 Chrome profile 目錄（預設在系統暫存區） |
 
@@ -231,5 +233,7 @@ go vet ./...
 go test ./...
 go build ./...
 ```
+
+`make fmt` / `make vet` / `make test` 包裝上方對應指令；`make build` 建置本機平台執行檔到 `dist/`。交叉編譯與打包見上方「取得執行檔」。
 
 原始碼入口：`cmd/nrf-factory/`（Go + 內嵌 `web/index.html`）。實作計畫見 `PLAN.md`。

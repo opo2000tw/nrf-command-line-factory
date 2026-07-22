@@ -2,7 +2,7 @@
 
 - 階段: Release
 - 優先: P1
-- 狀態: todo
+- 狀態: doing
 
 ## 背景
 專案已推送至 github.com/opo2000tw/nrf-command-line-factory 的 main 分支，但目前完全沒有自動化的發布流程。
