@@ -16,11 +16,13 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -519,8 +521,8 @@ func openBrowser(url string) error {
 }
 
 func main() {
-	noBrowser := flag.Bool("no-browser", false, "do not open the system browser")
-	// :0 = OS picks a free port. Prefer a fixed port for factory scripts (e.g. 127.0.0.1:17832).
+	noBrowser := flag.Bool("no-browser", false, "serve only; do not launch a browser")
+	// :0 = OS picks a free port. Set e.g. 127.0.0.1:17832 for a fixed factory port.
 	addr := flag.String("addr", "127.0.0.1:0", "loopback listen address (host:port)")
 	flag.Parse()
 
@@ -541,17 +543,57 @@ func main() {
 	}
 	url := "http://" + listener.Addr().String()
 	fmt.Println("nRF Factory:", url)
-	if !*noBrowser {
-		if err := openBrowser(url); err != nil {
-			log.Printf("open browser: %v", err)
-		}
-	}
 
 	server := &http.Server{
 		Handler:           application.routes(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatal(err)
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- server.Serve(listener) }()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	// Default: open a dedicated Chrome/Edge app window whose close ends the
+	// session. Fall back to a normal browser tab when no Chromium is found.
+	var session *browserSession
+	switch {
+	case *noBrowser:
+		fmt.Println("未開啟瀏覽器；用上面的網址自行開啟，按 Ctrl+C 停止")
+	default:
+		if s, ok := startAppWindow(url); ok {
+			session = s
+			fmt.Println("關閉 app 視窗或按 Ctrl+C 即停止 nRF Factory")
+		} else {
+			if err := openBrowser(url); err != nil {
+				log.Printf("open browser: %v", err)
+			}
+			fmt.Println("找不到 Chrome/Edge app 視窗模式，已開一般分頁；按 Ctrl+C 停止")
+		}
+	}
+
+	// A nil channel blocks forever, so without an app window only a signal or a
+	// server failure ends the wait.
+	var browserClosed <-chan struct{}
+	if session != nil {
+		browserClosed = session.done
+	}
+
+	select {
+	case <-browserClosed:
+		fmt.Println("app 視窗已關閉，停止服務")
+	case s := <-sigCh:
+		fmt.Printf("收到 %s，停止服務\n", s)
+	case err := <-serveErr:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Print(err)
+		}
+	}
+
+	session.kill()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("shutdown: %v", err)
 	}
 }

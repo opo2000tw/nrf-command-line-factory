@@ -496,7 +496,7 @@
     function networkHint(error) {
       const raw = (error && error.message) || String(error || "");
       if (/failed to fetch|networkerror|load failed|network request failed/i.test(raw)) {
-        return "連不上本機服務（Failed to fetch）。請執行 ./exec.sh status 檢查；若已停則 ./exec.sh 重開（port 每次不同，舊視窗會失效）。";
+        return "連不上本機服務（Failed to fetch）。服務可能已停止（關掉 app 視窗＝停服務）。請重新啟動程式；重開後 port 可能不同，舊視窗會失效，請改用新視窗。";
       }
       return raw || "未知錯誤";
     }
@@ -651,7 +651,7 @@
     // Stale green status after the Go process dies is confusing; poll while idle.
     setInterval(() => {
       if (busy) return;
-      pingServer().catch(() => markOffline("本機服務已停止 — 請執行 ./exec.sh 重開"));
+      pingServer().catch(() => markOffline("本機服務已停止 — 請重新啟動程式"));
     }, 3000);
   </script>
 </body>

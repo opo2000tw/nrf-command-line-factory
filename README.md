@@ -77,78 +77,42 @@ GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-s -w" \
 
 ### 啟動
 
-#### 建議：app 視窗（Chrome / Edge `--app=`）
+執行檔為單一自足程式：啟動後綁定本機 loopback，並自動以獨立 profile 的 Chrome / Edge app 視窗開啟畫面。**關閉該 app 視窗，或在主控台按 Ctrl+C，都會停止服務**（獨立 profile，關窗即結束該 browser process，程式接著自動 graceful shutdown）。
 
-不開一般瀏覽器分頁，改用獨立 app 視窗。預設固定 **`http://127.0.0.1:17832`**。
+雙擊啟動：
 
-**生命週期：關掉 app 視窗 = 停止 nRF Factory 服務**（獨立 Chrome profile，關最後一個窗就結束該 process，腳本接著 kill server）。
+| 平台 | 動作 |
+|------|------|
+| Windows | 檔案總管雙擊 `nrf-factory-windows-amd64.exe` |
+| macOS | Finder 雙擊 `exec.command`（開終端機並跑對應架構執行檔） |
 
-```bash
-./exec.sh              # 起服務 + 開窗，擋在終端；關窗後自動 stop
-./exec.sh open         # 只重開窗（服務須已在跑；不接管生命週期）
-./exec.sh status
-./exec.sh stop         # 強制停服務（並試著關 app Chrome）
-```
-
-**雙擊啟動**
-
-| 檔案 | 平台 | 說明 |
-|------|------|------|
-| `exec.command` | macOS | Finder **雙擊**會開「終端機」並跑 `exec.sh`（`.sh` 本身雙擊通常不會執行） |
-| `exec.bat` | Windows | 檔案總管雙擊；有 Git Bash 時走完整 `exec.sh` session，否則直接開 `.exe` |
-
-第一次若 macOS 擋 `exec.command`：右鍵 → 打開，或：
+或在終端直接跑：
 
 ```bash
-chmod +x exec.command exec.sh scripts/browser-app.sh
-xattr -d com.apple.quarantine exec.command   # 若從下載/AirDrop 來
+./dist/nrf-factory-darwin-arm64          # macOS Apple Silicon
+./dist/nrf-factory-darwin-amd64          # macOS Intel
 ```
 
-| 指令 / 變數 | 說明 |
+啟動行為：
+
+1. 綁定 `127.0.0.1` 隨機 port（不對外網開放），主控台印出 `nRF Factory: http://127.0.0.1:<port>`。
+2. 找到 Chrome / Edge / Chromium / Brave 其一時，開獨立 app 視窗（專用 profile）；找不到時退回開系統預設瀏覽器分頁。
+3. 關閉 app 視窗 → 服務自動停止；Ctrl+C 亦停止服務並關閉該 app 視窗。
+
+| 旗標 / 變數 | 說明 |
 |-------------|------|
-| `./exec.sh` / `start` | session：起服務 → 開窗 → **關窗即停服務** |
-| `./exec.sh open` | 僅再開一個 app 窗 |
-| `./exec.sh stop` | 強制停止 |
-| `./exec.sh status` | pid / url |
-| `NRF_FACTORY_BIN` | 指定執行檔 |
-| `NRF_FACTORY_ADDR` | 預設 `127.0.0.1:17832` |
-| `.run/` | pid / url / log / chrome-profile（gitignore） |
+| `-addr` | loopback 監聽位址，預設 `127.0.0.1:0`（隨機 port）；工廠可固定如 `127.0.0.1:17832` |
+| `-no-browser` | 只起服務、不開瀏覽器；用主控台印的網址自行開啟，Ctrl+C 停止 |
+| `NRFUTIL_PATH` | `nrfutil` 不在 `PATH` 時指向完整路徑 |
+| `NRF_FACTORY_PROFILE` | 覆寫 app 視窗使用的 Chrome profile 目錄（預設在系統暫存區） |
+
+固定 port 範例：
 
 ```bash
-NRF_FACTORY_BIN=./dist/nrf-factory-darwin-arm64 ./exec.sh
+./dist/nrf-factory-darwin-arm64 -addr 127.0.0.1:17832
 ```
 
-需已安裝 Chrome、Edge、Chromium 或 Brave 其一。
-
-#### 直接跑執行檔
-
-**Windows**
-
-```text
-nrf-factory-windows-amd64.exe
-```
-
-**macOS**
-
-```bash
-./dist/nrf-factory-darwin-arm64          # Apple Silicon
-# 或
-./dist/nrf-factory-darwin-amd64          # Intel
-```
-
-行為：
-
-1. 綁定 `127.0.0.1` 隨機 port（不對外網開放）。
-2. 主控台印出 `nRF Factory: http://127.0.0.1:<port>`。
-3. 預設自動開系統瀏覽器（一般分頁）；不要開瀏覽器時加 `-no-browser`。
-
-```bash
-./dist/nrf-factory-darwin-arm64 -no-browser
-# 另開 app 視窗：
-./scripts/browser-app.sh http://127.0.0.1:PORT
-```
-
-關閉服務：用 `./exec.sh` 時 **關掉 app 視窗** 即停；或 `./exec.sh stop` / 終端 `Ctrl+C`。直接前景跑 binary 時，在該終端 `Ctrl+C`。
+需已安裝 Chrome、Edge、Chromium 或 Brave 其一才會走 app 視窗；否則自動退回一般分頁。
 
 #### macOS Gatekeeper
 
@@ -212,7 +176,7 @@ xattr -d com.apple.quarantine nrf-factory-darwin-arm64
 | 開始燒錄按鈕灰的 | 尚未選 `.hex`，或正在燒錄 | 先選檔；等 busy 結束 |
 | 非 `.hex` 被拒 | 第一版只收 hex | 換成 `.hex` |
 | macOS 打不開 | Gatekeeper quarantine | 見上方 `xattr` / 右鍵開啟 |
-| 關掉瀏覽器後畫面沒了 | 服務仍在跑 | 用主控台印的 URL 再開，或重啟程式 |
+| 關掉 app 視窗後服務就停了 | 這是預設行為（關窗＝停服務） | 想保留服務改用 `-no-browser`，再自行開網址 |
 
 ### 安全與範圍（第一版）
 
