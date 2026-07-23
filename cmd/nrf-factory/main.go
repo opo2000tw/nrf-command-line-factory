@@ -225,6 +225,9 @@ func (a *app) handleFlash(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "已有燒錄工作進行中")
 		return
 	}
+	// finishFlash clears busy on the normal path; this idempotent safety net
+	// keeps a panic between here and there from wedging busy at true forever.
+	defer a.clearBusy()
 
 	stream := newEventWriter(w)
 	_ = stream.event("info", fmt.Sprintf("%s 側：準備燒錄 %s", side, displayName), false, false, nil)
@@ -309,6 +312,9 @@ func (a *app) handleInstallDevice(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "已有工作進行中")
 		return
 	}
+	// The post-install probe below clears busy on the normal path; this
+	// idempotent safety net keeps a panic from wedging busy at true forever.
+	defer a.clearBusy()
 
 	command := a.currentCommand()
 	stream := newEventWriter(w)

@@ -36,7 +36,9 @@
 | make package 從未在 CI dry-run | sonnet+codex | 打包鏈只有正式 tag 才第一次執行。方向:PR 期跑一次 dry-run。 |
 | 3rd/ 二進位未走 git-lfs + 無供應鏈 manifest | 三方 | 違反大檔用 git-lfs 慣例;缺來源/版本/SHA-256/授權 manifest。列入 release-03。 |
 | http.Server timeout 不足 | codex | 已設 ReadHeaderTimeout;缺 IdleTimeout/MaxHeaderBytes(NDJSON 串流需 heartbeat 而非短 WriteTimeout)。 |
-| CommandContext 不 kill process group | sonnet+codex | nrfutil 孫行程可能殘留(對應 browser.go 既有簡化註解)。 |
+| CommandContext 不 kill process group | sonnet+codex | nrfutil 孫行程可能殘留(對應 browser.go 既有簡化註解)。2026-07-23 macOS 核驗補充:不只孫行程——force-stop 路徑(二次 Ctrl+C / 等待逾時)只讓 main 返回,燒錄中的 nrfutil 本身的 ctx 從未被 cancel,會變孤兒行程繼續寫韌體,下次啟動 J-Link 可能仍被佔用。 |
+| newApp 未含 deviceReady,靠呼叫端補設 | 2026-07-23 macOS 核驗 | 目前唯一 production call site 有補,無現行 bug;但該行被移除時 deviceReady 會靜默退回 false,屬維護 foot-gun。 |
+| installedJLinkVersion 兩次呼叫共用 5 秒 ctx | 2026-07-23 macOS 核驗 | 第一次呼叫吃掉大半預算時 fallback 會被時間壓垮;實測回應 <100ms 未觸發,防禦性強化項。 |
 | 前端非 .hex 無 client 驗證 | 三方 | 選錯檔要一次網路來回才知。方向:change handler 加副檔名檢查。 |
 | eventWriter 無界 + 進度回車 | sonnet+codex | nrfutil 若以回車印進度,事件與 DOM 可能膨脹;需實機輸出定嚴重度。 |
 | clearSingletonLocks 不驗行程存活 | sonnet | 雙開會清掉仍在用的 Chrome lock,毀 profile。與 run-02 同源。 |
