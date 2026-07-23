@@ -2,6 +2,8 @@
 
 以下依 Build / Package / Release / Run / Test / Security 階段列出目前規劃的工作項目，狀態欄位反映各 ticket 檔案內的 `狀態` 欄位。
 
+todo 項目已鏡射為 GitHub issues（P1/P2 掛 milestone v1.1.0，P3 為 backlog）；驗收條件以本目錄的 ticket 檔為準，issue 僅作追蹤入口。
+
 ## Build
 
 | ID | 標題 | 優先 | 狀態 |
