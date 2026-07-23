@@ -2,6 +2,15 @@
 
 本專案採 SemVer；git tag 慣例 `vMAJOR.MINOR.PATCH`。版號與 bump 規則見 `tickets/release-01-versioning-policy.md`。
 
+## [0.1.4]
+
+### Fixed
+- 燒錄中的 UI 鎖定：先前 flash 送出後 UI 會短暫解鎖，操作員可能誤按清除計數或安裝等按鈕；現在整段燒錄期間確實鎖住，且燒錄中重新整理或關閉視窗會先跳確認。
+- 燒錄／安裝不再被瀏覽器斷線中斷：重新整理、關閉視窗或連線瞬斷不會再腰斬正在進行的 nrfutil（避免半寫入的目標）；關閉視窗時若仍在燒錄，會等到完成才停止服務（可再按一次 Ctrl+C 強制停止）。
+
+### Changed
+- release 產物加上 SHA256SUMS 回驗與 zip 內容檢查；CI 升到 Node 22 並修正 go.sum 快取警告。
+
 ## [0.1.3]
 
 ### Fixed
