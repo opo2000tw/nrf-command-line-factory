@@ -54,9 +54,19 @@ type app struct {
 	busy        bool
 	command     string
 	run         commandRunner
-	probe       func(string) (bool, string)
+	probe       func(string) toolStatus
 	toolReady   bool
+	deviceReady bool
 	toolMessage string
+}
+
+// toolStatus is what a preflight probe reports. deviceReady tracks the nrfutil
+// device command specifically (independent of the J-Link check), so the UI can
+// grey out "安裝 device 命令" once it is already installed.
+type toolStatus struct {
+	ready       bool
+	deviceReady bool
+	message     string
 }
 
 type snapshot struct {
@@ -64,6 +74,7 @@ type snapshot struct {
 	RightCount  int    `json:"rightCount"`
 	Busy        bool   `json:"busy"`
 	ToolReady   bool   `json:"toolReady"`
+	DeviceReady bool   `json:"deviceReady"`
 	ToolMessage string `json:"toolMessage"`
 	Command     string `json:"command"`
 	Version     string `json:"version"`
@@ -274,11 +285,12 @@ func (a *app) handleTool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ready, message := a.probe(path)
+	status := a.probe(path)
 	a.mu.Lock()
 	a.command = path
-	a.toolReady = ready
-	a.toolMessage = message
+	a.toolReady = status.ready
+	a.deviceReady = status.deviceReady
+	a.toolMessage = status.message
 	a.mu.Unlock()
 
 	writeJSON(w, http.StatusOK, a.currentSnapshot())
@@ -306,10 +318,11 @@ func (a *app) handleInstallDevice(w http.ResponseWriter, r *http.Request) {
 	runErr := a.run(ctx, command, []string{"install", "device"}, stream)
 	_ = stream.flushPending()
 
-	ready, message := a.probe(command)
+	status := a.probe(command)
 	a.mu.Lock()
-	a.toolReady = ready
-	a.toolMessage = message
+	a.toolReady = status.ready
+	a.deviceReady = status.deviceReady
+	a.toolMessage = status.message
 	a.busy = false
 	a.mu.Unlock()
 	state := a.currentSnapshot()
@@ -318,7 +331,7 @@ func (a *app) handleInstallDevice(w http.ResponseWriter, r *http.Request) {
 		_ = stream.event("success", "device 命令安裝完成", true, true, &state)
 		return
 	}
-	message = "安裝失敗：" + runErr.Error()
+	message := "安裝失敗：" + runErr.Error()
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		message = "安裝逾時"
 	}
@@ -433,6 +446,7 @@ func (a *app) currentSnapshot() snapshot {
 		RightCount:  a.rightCount,
 		Busy:        a.busy,
 		ToolReady:   a.toolReady,
+		DeviceReady: a.deviceReady,
 		ToolMessage: a.toolMessage,
 		Command:     a.command,
 		Version:     version,
@@ -581,23 +595,23 @@ func execCommand(ctx context.Context, name string, args []string, output io.Writ
 	return cmd.Run()
 }
 
-func probeNRFUtil(command string) (bool, string) {
+func probeNRFUtil(command string) toolStatus {
 	path, err := exec.LookPath(command)
 	if err != nil {
-		return false, "找不到 nrfutil，請先安裝 Nordic nRF Util 與 device command"
+		return toolStatus{message: "找不到 nrfutil，請先安裝 Nordic nRF Util 與 device command"}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	coreVersion, err := firstOutputLine(ctx, path, "--version")
 	if err != nil {
-		return false, "nrfutil 無法執行"
+		return toolStatus{message: "nrfutil 無法執行"}
 	}
 	deviceVersion, err := firstOutputLine(ctx, path, "device", "--version")
 	if err != nil {
-		return false, "缺少 nrfutil device command；請執行 nrfutil install device"
+		return toolStatus{message: "缺少 nrfutil device command；請執行 nrfutil install device"}
 	}
-	return true, coreVersion + " · " + deviceVersion
+	return toolStatus{ready: true, deviceReady: true, message: coreVersion + " · " + deviceVersion}
 }
 
 // jLinkSearchGlobs lists glob patterns for the SEGGER J-Link executable in its
@@ -686,15 +700,17 @@ func probeJLink(command string) (bool, string) {
 }
 
 // preflight aggregates the environment checks and names whichever tool is missing.
-func preflight(command string) (bool, string) {
-	ready, message := probeNRFUtil(command)
-	if !ready {
-		return false, message
+// deviceReady is preserved from the nrfutil probe even when J-Link is missing, so
+// the UI can tell "device command already installed" apart from the aggregate.
+func preflight(command string) toolStatus {
+	status := probeNRFUtil(command)
+	if !status.ready {
+		return status
 	}
 	if ok, jmsg := probeJLink(command); !ok {
-		return false, jmsg
+		return toolStatus{ready: false, deviceReady: status.deviceReady, message: jmsg}
 	}
-	return true, message + " · J-Link OK"
+	return toolStatus{ready: true, deviceReady: true, message: status.message + " · J-Link OK"}
 }
 
 func firstOutputLine(ctx context.Context, name string, args ...string) (string, error) {
@@ -808,8 +824,9 @@ func main() {
 	}
 
 	command := resolveNRFUtil()
-	ready, message := preflight(command)
-	application := newApp(command, execCommand, ready, message)
+	status := preflight(command)
+	application := newApp(command, execCommand, status.ready, status.message)
+	application.deviceReady = status.deviceReady
 
 	listenAddr := strings.TrimSpace(*addr)
 	if listenAddr == "" {

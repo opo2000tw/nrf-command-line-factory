@@ -364,7 +364,9 @@ func TestInstallDeviceStreamsAndRefreshes(t *testing.T) {
 		return nil
 	}
 	application := newApp("nrfutil", runner, false, "缺 device command")
-	application.probe = func(string) (bool, string) { return true, "nrfutil ok · device ok" }
+	application.probe = func(string) toolStatus {
+		return toolStatus{ready: true, deviceReady: true, message: "nrfutil ok · device ok"}
+	}
 
 	recorder := httptest.NewRecorder()
 	application.handleInstallDevice(recorder, httptest.NewRequest(http.MethodPost, "/api/install-device", nil))
@@ -380,7 +382,7 @@ func TestInstallDeviceStreamsAndRefreshes(t *testing.T) {
 	if !last.Done || !last.Success || last.Level != "success" {
 		t.Fatalf("last event = %+v", last)
 	}
-	if last.State == nil || !last.State.ToolReady || last.State.Busy {
+	if last.State == nil || !last.State.ToolReady || !last.State.DeviceReady || last.State.Busy {
 		t.Fatalf("state = %+v", last.State)
 	}
 }
@@ -391,7 +393,7 @@ func TestInstallDeviceFailureReportsError(t *testing.T) {
 		return errors.New("exit status 1")
 	}
 	application := newApp("nrfutil", runner, false, "缺 device command")
-	application.probe = func(string) (bool, string) { return false, "仍缺 device command" }
+	application.probe = func(string) toolStatus { return toolStatus{message: "仍缺 device command"} }
 
 	recorder := httptest.NewRecorder()
 	application.handleInstallDevice(recorder, httptest.NewRequest(http.MethodPost, "/api/install-device", nil))
@@ -401,7 +403,7 @@ func TestInstallDeviceFailureReportsError(t *testing.T) {
 	if !last.Done || last.Success || last.Level != "error" {
 		t.Fatalf("last event = %+v", last)
 	}
-	if last.State == nil || last.State.ToolReady || last.State.Busy {
+	if last.State == nil || last.State.ToolReady || last.State.DeviceReady || last.State.Busy {
 		t.Fatalf("state = %+v", last.State)
 	}
 }
@@ -409,7 +411,10 @@ func TestInstallDeviceFailureReportsError(t *testing.T) {
 func TestToolUploadSetsCommand(t *testing.T) {
 	application := newApp("nrfutil", nil, false, "找不到 nrfutil")
 	var probed string
-	application.probe = func(path string) (bool, string) { probed = path; return true, "工具就緒" }
+	application.probe = func(path string) toolStatus {
+		probed = path
+		return toolStatus{ready: true, deviceReady: true, message: "工具就緒"}
+	}
 
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)

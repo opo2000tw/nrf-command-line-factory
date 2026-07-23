@@ -16,6 +16,7 @@ export type AppState = {
   rightCount: number;
   busy: boolean;
   toolReady: boolean;
+  deviceReady: boolean;
   toolMessage: string;
   command: string;
   version: string;
@@ -37,6 +38,7 @@ export function defaultState(overrides: Partial<AppState> = {}): AppState {
     rightCount: 0,
     busy: false,
     toolReady: true,
+    deviceReady: true,
     toolMessage: "nrfutil 7.13.0 · device 2.7.6 · J-Link OK",
     command: "nrfutil",
     version: "test-1.2.3",

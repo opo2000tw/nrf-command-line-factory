@@ -83,6 +83,7 @@ test.describe("tool setup", () => {
   test("installing the device command succeeds and shows the ready state", async ({ page }) => {
     await gotoApp(page, {
       toolReady: false,
+      deviceReady: false,
       toolMessage: "缺少 nrfutil device command；請執行 nrfutil install device",
     });
 
@@ -109,10 +110,13 @@ test.describe("tool setup", () => {
     await expect(page.locator(".log-line.success")).toContainText("device 命令安裝完成");
     await expect(page.locator("#toolStatus")).toHaveClass(/ready/);
     await expect(page.locator("#toolMessage")).toContainText("J-Link OK");
+    // Now that the device command is installed, the button greys out.
+    await expect(page.locator("#installButton")).toBeDisabled();
+    await expect(page.locator("#installButton")).toHaveText("device 命令已安裝");
   });
 
   test("busy lock: installing disables inputs mid-request, then releases on completion", async ({ page }) => {
-    await gotoApp(page);
+    await gotoApp(page, { deviceReady: false });
 
     // No pre-ping before POSTing /api/install-device (unlike flash/tool), so the
     // busy lock is driven purely by the gated response below.
@@ -145,12 +149,12 @@ test.describe("tool setup", () => {
 
     gate.open();
 
-    await expect(page.locator("#installButton")).toBeEnabled();
     await expect(page.locator("body")).not.toHaveClass(/busy/);
+    await expect(page.locator("#firmware")).toBeEnabled();
   });
 
   test("installing fails with an HTTP error and logs the message", async ({ page }) => {
-    await gotoApp(page);
+    await gotoApp(page, { deviceReady: false });
 
     await page.route(INSTALL_ROUTE, (route) =>
       route.fulfill({
@@ -163,6 +167,24 @@ test.describe("tool setup", () => {
     await page.locator("#installButton").click();
 
     await expect(page.locator(".log-line.error")).toContainText("安裝失敗：network down");
+  });
+
+  test("install button is greyed out when the device command is already installed", async ({ page }) => {
+    await gotoApp(page, { deviceReady: true });
+
+    await expect(page.locator("#installButton")).toBeDisabled();
+    await expect(page.locator("#installButton")).toHaveText("device 命令已安裝");
+  });
+
+  test("install button is enabled when the device command is missing", async ({ page }) => {
+    await gotoApp(page, {
+      toolReady: false,
+      deviceReady: false,
+      toolMessage: "缺少 nrfutil device command；請執行 nrfutil install device",
+    });
+
+    await expect(page.locator("#installButton")).toBeEnabled();
+    await expect(page.locator("#installButton")).toHaveText("安裝 device 命令");
   });
 
   test("loading with a bundled 3rd/ command shows the bundled hint", async ({ page }) => {

@@ -511,6 +511,7 @@
     let selectedSide = "L";
     let busy = false;
     let serverOnline = false;
+    let deviceReady = false;
 
     function appendLog(message, level = "info") {
       if (!message) return;
@@ -552,6 +553,7 @@
       }
       const appVersion = document.querySelector("#appVersion");
       if (appVersion) appVersion.textContent = state.version || "—";
+      deviceReady = !!state.deviceReady;
       setBusy(state.busy);
     }
 
@@ -561,7 +563,9 @@
       firmwareInput.disabled = busy;
       resetButton.disabled = busy || !serverOnline;
       toolFile.disabled = busy;
-      installButton.disabled = busy || !serverOnline;
+      // device command already installed => nothing to install, so grey it out.
+      installButton.disabled = busy || !serverOnline || deviceReady;
+      installButton.textContent = deviceReady ? "device 命令已安裝" : "安裝 device 命令";
       stations.forEach(button => button.disabled = busy);
       refreshFlashButton();
     }
