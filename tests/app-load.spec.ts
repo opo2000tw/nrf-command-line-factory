@@ -9,14 +9,14 @@ test.describe("app load", () => {
       leftCount: 3,
       rightCount: 5,
       toolReady: true,
-      toolMessage: "nrfutil 7.13.0 · device 2.7.6 · J-Link OK",
+      toolMessage: "nrfutil 7.13.0 · device 2.7.6 · SEGGER J-Link V9.60 OK",
       version: "v9.9.9",
     });
 
     await expect(page.locator("#leftCount")).toHaveText("3");
     await expect(page.locator("#rightCount")).toHaveText("5");
     await expect(page.locator("#toolStatus")).toHaveClass(/ready/);
-    await expect(page.locator("#toolMessage")).toContainText("J-Link OK");
+    await expect(page.locator("#toolMessage")).toContainText("SEGGER J-Link V9.60 OK");
     await expect(page.locator("#appVersion")).toHaveText("v9.9.9");
   });
 

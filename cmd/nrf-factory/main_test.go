@@ -239,6 +239,129 @@ func TestResetCounts(t *testing.T) {
 	}
 }
 
+func TestNormalizeJLinkVersion(t *testing.T) {
+	cases := map[string]string{
+		"":             "",
+		"JLink_V9.60":  "V9.60",
+		"JLink_V9.24a": "V9.24a",
+		"V9.60":        "V9.60",
+		"9.60":         "V9.60",
+		// Compact pack ids (same digits as folder names) must expand, not stay "V960".
+		"JLink_V960":  "V9.60",
+		"JLink_V924a": "V9.24a",
+		"V960":        "V9.60",
+		"V924a":       "V9.24a",
+		"960":         "V9.60",
+	}
+	for in, want := range cases {
+		if got := normalizeJLinkVersion(in); got != want {
+			t.Fatalf("normalizeJLinkVersion(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestVersionFromJLinkDir(t *testing.T) {
+	// Paths need not exist: we only parse the parent directory name (EvalSymlinks
+	// is a no-op when the path is missing).
+	root := string(filepath.Separator)
+	cases := []struct {
+		path string
+		want string
+	}{
+		{filepath.Join(root, "Applications", "SEGGER", "JLink_V960", "JLinkExe"), "V9.60"},
+		{filepath.Join(root, "opt", "SEGGER", "JLink_V924a", "JLink.exe"), "V9.24a"},
+		{filepath.Join(root, "opt", "SEGGER", "JLink_V948", "JLinkExe"), "V9.48"},
+		{filepath.Join(root, "opt", "SEGGER", "JLink_V794e", "JLinkExe"), "V7.94e"},
+		{filepath.Join(root, "opt", "SEGGER", "JLink_V794", "JLinkExe"), "V7.94"},
+		// Plain "JLink" pointer that does not resolve via symlink → no version in the name.
+		// (A real /Applications/SEGGER/JLink symlink is followed by EvalSymlinks.)
+		{filepath.Join(t.TempDir(), "SEGGER", "JLink", "JLinkExe"), ""},
+		{filepath.Join(t.TempDir(), "bin", "JLinkExe"), ""},
+	}
+	for _, tc := range cases {
+		if got := versionFromJLinkDir(tc.path); got != tc.want {
+			t.Fatalf("versionFromJLinkDir(%q) = %q, want %q", tc.path, got, tc.want)
+		}
+	}
+}
+
+func TestJLinkVersionGreater(t *testing.T) {
+	// V960 must rank above V924a (not string / path order).
+	if !jLinkVersionGreater("V9.60", "V9.24a") {
+		t.Fatal("expected V9.60 > V9.24a")
+	}
+	if jLinkVersionGreater("V9.24a", "V9.60") {
+		t.Fatal("expected V9.24a < V9.60")
+	}
+	if !jLinkVersionGreater("V9.24a", "V9.24") {
+		t.Fatal("expected hotfix letter V9.24a > V9.24")
+	}
+	if !jLinkVersionGreater("V9.48", "V9.24a") {
+		t.Fatal("expected V9.48 > V9.24a")
+	}
+	if !jLinkVersionGreater("V9.60", "") {
+		t.Fatal("expected any version > empty")
+	}
+}
+
+func TestFindJLinkInstallPicksNewest(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fixture uses unix executable names")
+	}
+	root := t.TempDir()
+	// Create older and newer packs; filesystem order must not win.
+	for _, ver := range []string{"JLink_V960", "JLink_V924a", "JLink_V948"} {
+		dir := filepath.Join(root, ver)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "JLinkExe"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	prev := jLinkSearchGlobs
+	jLinkSearchGlobs = []string{filepath.Join(root, "JLink_*", "JLinkExe")}
+	t.Cleanup(func() { jLinkSearchGlobs = prev })
+
+	got, ok := findJLinkInstall()
+	if !ok {
+		t.Fatal("expected an install")
+	}
+	if versionFromJLinkDir(got) != "V9.60" {
+		t.Fatalf("picked %q (version %q), want newest JLink_V960", got, versionFromJLinkDir(got))
+	}
+}
+
+func TestJLinkStatusLabel(t *testing.T) {
+	if got := jLinkStatusLabel("V9.60"); got != "SEGGER J-Link V9.60 OK" {
+		t.Fatalf("version label = %q", got)
+	}
+}
+
+func TestJLinkInstallHintUsesTestedVersion(t *testing.T) {
+	dir := t.TempDir()
+	// Fake nrfutil that only implements `device --version --json` for testedJLinkVersion.
+	script := filepath.Join(dir, "nrfutil")
+	body := `#!/bin/sh
+if [ "$1" = "device" ] && [ "$2" = "--version" ] && [ "$3" = "--json" ]; then
+  printf '%s\n' '{"dependencies":[{"expectedVersion":{"version":"JLink_V9.24a"},"name":"JlinkARM","version":"JLink_V9.24a"}]}'
+  exit 0
+fi
+exit 1
+`
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	hint := jLinkInstallHint(script)
+	if !strings.Contains(hint, "V9.24a") {
+		t.Fatalf("hint %q should include suggested V9.24a", hint)
+	}
+	msg := jLinkMissingMessage(script)
+	if !strings.Contains(msg, "找不到") || !strings.Contains(msg, "V9.24a") {
+		t.Fatalf("missing message should name suggested version: %q", msg)
+	}
+}
+
 func TestProbeJLink(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("J-Link probe fixture is unix-only")
@@ -251,32 +374,45 @@ func TestProbeJLink(t *testing.T) {
 	t.Cleanup(func() { jLinkSearchGlobs = prev })
 
 	// nothing on PATH and nothing installed
-	if ok, msg := probeJLink("nonexistent-nrfutil"); ok || msg == "" {
+	ok, msg := probeJLink("nonexistent-nrfutil")
+	if ok || msg == "" {
 		t.Fatalf("expected J-Link missing, got ok=%v msg=%q", ok, msg)
 	}
+	if !strings.Contains(msg, "找不到") {
+		t.Fatalf("missing message = %q", msg)
+	}
 
-	// detected via PATH
+	// Binary on PATH but no version readable → fail and ask to reinstall.
 	pathFake := filepath.Join(pathDir, "JLinkExe")
 	if err := os.WriteFile(pathFake, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if ok, _ := probeJLink("nonexistent-nrfutil"); !ok {
-		t.Fatal("expected J-Link detected via JLinkExe on PATH")
+	ok, msg = probeJLink("nonexistent-nrfutil")
+	if ok {
+		t.Fatal("expected failure when version cannot be read")
+	}
+	if !strings.Contains(msg, "重新安裝") {
+		t.Fatalf("unknown-version message = %q", msg)
 	}
 	if err := os.Remove(pathFake); err != nil {
 		t.Fatal(err)
 	}
 
-	// detected via the standard install dir without any PATH entry
+	// Standard install dir with versioned folder name → OK with that version.
 	instDir := filepath.Join(installRoot, "JLink_V794")
 	if err := os.MkdirAll(instDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(instDir, "JLinkExe"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+	exe := filepath.Join(instDir, "JLinkExe")
+	if err := os.WriteFile(exe, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if ok, _ := probeJLink("nonexistent-nrfutil"); !ok {
-		t.Fatal("expected J-Link detected via the standard install dir without PATH")
+	ok, ver := probeJLink("nonexistent-nrfutil")
+	if !ok {
+		t.Fatalf("expected J-Link OK via versioned install dir, got %q", ver)
+	}
+	if ver != "V7.94" {
+		t.Fatalf("version from install dir = %q, want V7.94", ver)
 	}
 }
 

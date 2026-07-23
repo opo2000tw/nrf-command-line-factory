@@ -647,21 +647,47 @@ func defaultJLinkGlobs() []string {
 	}
 }
 
-// findJLinkInstall returns the first SEGGER J-Link executable found in the
-// standard install locations.
+// findJLinkInstall returns a SEGGER J-Link executable from the standard install
+// locations. Preference order:
+//  1. the current "JLink" install pointer (symlink / junction to the active pack)
+//  2. the highest JLink_V* folder (e.g. V960 > V924a > V794), not filesystem order
 func findJLinkInstall() (string, bool) {
+	var best string
+	var bestVer string
 	for _, pattern := range jLinkSearchGlobs {
 		matches, _ := filepath.Glob(pattern)
 		for _, match := range matches {
-			if info, err := os.Stat(match); err == nil && !info.IsDir() {
+			info, err := os.Stat(match)
+			if err != nil || info.IsDir() {
+				continue
+			}
+			dir := filepath.Base(filepath.Dir(match))
+			// Current install name used by SEGGER on every OS ("JLink" → active pack).
+			if strings.EqualFold(dir, "JLink") {
 				return match, true
+			}
+			ver := versionFromJLinkDir(match)
+			if best == "" || jLinkVersionGreater(ver, bestVer) {
+				best, bestVer = match, ver
 			}
 		}
 	}
-	return "", false
+	if best == "" {
+		return "", false
+	}
+	return best, true
 }
 
-var jLinkExpectedRe = regexp.MustCompile(`"expectedVersion"\s*:\s*\{\s*"version"\s*:\s*"([^"]+)"`)
+var (
+	jLinkExpectedRe  = regexp.MustCompile(`"expectedVersion"\s*:\s*\{\s*"version"\s*:\s*"([^"]+)"`)
+	jLinkInstalledRe = regexp.MustCompile(`"name"\s*:\s*"JlinkARM"\s*,\s*"version"\s*:\s*"([^"]+)"`)
+	jLinkDetectedRe  = regexp.MustCompile(`Detected SEGGER J-Link version:\s*(\S+)`)
+	jLinkCommanderRe = regexp.MustCompile(`J-Link Commander\s+(V[\d.]+[a-zA-Z]?)`)
+	// SEGGER pack folders: JLink_V960, JLink_V924a, JLink_V794e — digits are
+	// major+minor with a fixed 2-digit minor, optional single letter hotfix.
+	jLinkDirVerRe = regexp.MustCompile(`(?i)JLink_V(\d{3,})([a-zA-Z]?)$`)
+	jLinkSemVerRe = regexp.MustCompile(`(?i)^V?(\d+)\.(\d+)([a-zA-Z]?)$`)
+)
 
 // testedJLinkVersion asks nrfutil which J-Link version the device command was
 // tested against, so a missing-J-Link message can name the right one. Returns
@@ -679,24 +705,199 @@ func testedJLinkVersion(command string) string {
 	return ""
 }
 
-// probeJLink reports whether the SEGGER J-Link runtime is present, checking both
-// PATH and the standard install directory — a default Windows install does not
-// touch PATH, so PATH alone is not enough. ponytail: presence check only; the
-// actual link is verified later by `nrfutil device list`.
-func probeJLink(command string) (bool, string) {
+// resolveJLink returns the absolute path of a J-Link CLI if installed (PATH or
+// standard install dir). The SEGGER installer usually does not add PATH entries.
+func resolveJLink() (string, bool) {
 	for _, name := range []string{"JLinkExe", "JLink"} {
-		if _, err := exec.LookPath(name); err == nil {
-			return true, ""
+		if path, err := exec.LookPath(name); err == nil {
+			return path, true
 		}
 	}
-	if _, ok := findJLinkInstall(); ok {
-		return true, ""
+	return findJLinkInstall()
+}
+
+// normalizeJLinkVersion turns tags like JLink_V9.60 / V9.60 / 9.60 into "V9.60".
+// Compact folder forms (JLink_V960 / JLink_V924a) are handled by versionFromJLinkDir,
+// not here — stripping only the "JLink_" prefix would leave the misleading "V960".
+func normalizeJLinkVersion(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
 	}
-	msg := "找不到 SEGGER J-Link；請安裝 J-Link Software（SEGGER 官網），裝到標準路徑即可、不必手動設 PATH"
-	if v := testedJLinkVersion(command); v != "" {
-		msg += "。對應 tested 版：" + v + "（較新版通常亦可）"
+	raw = strings.TrimPrefix(raw, "JLink_")
+	raw = strings.TrimPrefix(raw, "jlink_")
+	if raw == "" {
+		return ""
 	}
-	return false, msg
+	// Compact pack id without dots (960, 924a) → expand like folder names.
+	if m := jLinkDirVerRe.FindStringSubmatch("JLink_V" + strings.TrimPrefix(strings.TrimPrefix(raw, "V"), "v")); m != nil && !strings.Contains(raw, ".") {
+		digits, suffix := m[1], m[2]
+		if len(digits) >= 3 {
+			return "V" + digits[:len(digits)-2] + "." + digits[len(digits)-2:] + suffix
+		}
+	}
+	if raw[0] == 'V' || raw[0] == 'v' {
+		return "V" + raw[1:]
+	}
+	return "V" + raw
+}
+
+// versionFromJLinkDir parses SEGGER install folder names.
+//
+//	JLink_V960  → V9.60
+//	JLink_V924a → V9.24a
+//	JLink_V794e → V7.94e
+//
+// Rule (SEGGER pack naming): after "JLink_V", all but the last two digits are the
+// major version; the last two digits are the minor; an optional trailing letter is
+// a hotfix suffix. Dotted names (JLink_V9.60) are not used for folder names on
+// disk — those come from nrfutil / commander banners via normalizeJLinkVersion.
+func versionFromJLinkDir(path string) string {
+	dir := filepath.Base(filepath.Dir(path))
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		dir = filepath.Base(filepath.Dir(resolved))
+	}
+	m := jLinkDirVerRe.FindStringSubmatch(dir)
+	if m == nil {
+		return ""
+	}
+	digits, suffix := m[1], m[2]
+	if len(digits) < 3 {
+		return ""
+	}
+	major, minor := digits[:len(digits)-2], digits[len(digits)-2:]
+	return "V" + major + "." + minor + suffix
+}
+
+// jLinkVersionGreater reports whether a is a higher SEGGER release than b.
+// Empty versions sort lowest. Hotfix letter: V9.24 < V9.24a < V9.24b < V9.60.
+func jLinkVersionGreater(a, b string) bool {
+	am, ai, al, aok := parseJLinkVersion(a)
+	bm, bi, bl, bok := parseJLinkVersion(b)
+	if !aok {
+		return false
+	}
+	if !bok {
+		return true
+	}
+	if am != bm {
+		return am > bm
+	}
+	if ai != bi {
+		return ai > bi
+	}
+	// No letter is treated as the base release; letter hotfixes sort after it.
+	return al > bl
+}
+
+func parseJLinkVersion(v string) (major, minor int, letter byte, ok bool) {
+	v = normalizeJLinkVersion(v)
+	m := jLinkSemVerRe.FindStringSubmatch(v)
+	if m == nil {
+		return 0, 0, 0, false
+	}
+	if _, err := fmt.Sscanf(m[1], "%d", &major); err != nil {
+		return 0, 0, 0, false
+	}
+	if _, err := fmt.Sscanf(m[2], "%d", &minor); err != nil {
+		return 0, 0, 0, false
+	}
+	if m[3] != "" {
+		letter = m[3][0]
+		if letter >= 'A' && letter <= 'Z' {
+			letter += 'a' - 'A'
+		}
+	}
+	return major, minor, letter, true
+}
+
+// versionFromJLinkExe runs the commander briefly and parses the banner version.
+func versionFromJLinkExe(exe string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, exe)
+	cmd.Stdin = strings.NewReader("exit\n")
+	out, _ := cmd.CombinedOutput()
+	if m := jLinkCommanderRe.FindSubmatch(out); m != nil {
+		return normalizeJLinkVersion(string(m[1]))
+	}
+	return ""
+}
+
+// installedJLinkVersion prefers the version nrfutil actually loaded, then the
+// install directory name, then the commander banner.
+func installedJLinkVersion(nrfutilCmd, jlinkExe string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if nrfutilCmd != "" {
+		if out, err := exec.CommandContext(ctx, nrfutilCmd, "device", "--version", "--json").CombinedOutput(); err == nil {
+			if m := jLinkInstalledRe.FindSubmatch(out); m != nil {
+				return normalizeJLinkVersion(string(m[1]))
+			}
+		}
+		if out, err := exec.CommandContext(ctx, nrfutilCmd, "device", "--version").CombinedOutput(); err == nil {
+			if m := jLinkDetectedRe.FindSubmatch(out); m != nil {
+				return normalizeJLinkVersion(string(m[1]))
+			}
+		}
+	}
+	if v := versionFromJLinkDir(jlinkExe); v != "" {
+		return v
+	}
+	return versionFromJLinkExe(jlinkExe)
+}
+
+// jLinkStatusLabel is the preflight fragment when the version is known,
+// e.g. "SEGGER J-Link V9.60 OK". version must be non-empty.
+func jLinkStatusLabel(version string) string {
+	return "SEGGER J-Link " + version + " OK"
+}
+
+// suggestedJLinkVersion is the pack version nrfutil-device was tested with
+// (e.g. "V9.24a"), or "" if unknown. Prefer this over any host-local install.
+func suggestedJLinkVersion(command string) string {
+	return normalizeJLinkVersion(testedJLinkVersion(command))
+}
+
+// jLinkInstallHint appends the nrfutil-tested version when available so the
+// operator knows which pack to download.
+func jLinkInstallHint(command string) string {
+	if v := suggestedJLinkVersion(command); v != "" {
+		return "建議版本 " + v + "（nrfutil device tested 版，較新版通常亦可）"
+	}
+	return "請至 SEGGER 官網下載 J-Link Software and Documentation Pack"
+}
+
+// jLinkMissingMessage asks the operator to install into the standard path.
+func jLinkMissingMessage(command string) string {
+	return "找不到 SEGGER J-Link；請安裝 J-Link Software（SEGGER 官網），" +
+		jLinkInstallHint(command) +
+		"。裝到標準路徑即可、不必手動設 PATH"
+}
+
+// jLinkUnknownVersionMessage is used when a binary is present but no install
+// version can be read — treat as broken install and ask for a clean reinstall.
+func jLinkUnknownVersionMessage(command string) string {
+	return "偵測到 SEGGER J-Link 但讀不到安裝版本，請重新安裝 J-Link Software（SEGGER 官網），" +
+		jLinkInstallHint(command) +
+		"。裝到標準路徑後重開程式"
+}
+
+// probeJLink reports whether a usable SEGGER J-Link install is present (PATH or
+// standard install dir) and its version can be read. On success the second
+// return is the version (e.g. "V9.60"). On failure it is a human error asking
+// to install or reinstall. The actual probe link is verified later by
+// `nrfutil device list`.
+func probeJLink(command string) (bool, string) {
+	path, ok := resolveJLink()
+	if !ok {
+		return false, jLinkMissingMessage(command)
+	}
+	ver := installedJLinkVersion(command, path)
+	if ver == "" {
+		return false, jLinkUnknownVersionMessage(command)
+	}
+	return true, ver
 }
 
 // preflight aggregates the environment checks and names whichever tool is missing.
@@ -707,10 +908,11 @@ func preflight(command string) toolStatus {
 	if !status.ready {
 		return status
 	}
-	if ok, jmsg := probeJLink(command); !ok {
+	ok, jmsg := probeJLink(command)
+	if !ok {
 		return toolStatus{ready: false, deviceReady: status.deviceReady, message: jmsg}
 	}
-	return toolStatus{ready: true, deviceReady: true, message: status.message + " · J-Link OK"}
+	return toolStatus{ready: true, deviceReady: true, message: status.message + " · " + jLinkStatusLabel(jmsg)}
 }
 
 func firstOutputLine(ctx context.Context, name string, args ...string) (string, error) {

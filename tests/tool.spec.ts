@@ -20,7 +20,7 @@ test.describe("tool setup", () => {
         body: JSON.stringify(
           defaultState({
             toolReady: true,
-            toolMessage: "nrfutil 7.13.0 · device 2.7.6 · J-Link OK",
+            toolMessage: "nrfutil 7.13.0 · device 2.7.6 · SEGGER J-Link V9.60 OK",
             command: "/tmp/nrf-factory-nrfutil",
           }),
         ),
@@ -32,7 +32,7 @@ test.describe("tool setup", () => {
     await expect(page.locator(".log-line", { hasText: "指定 nrfutil：nrfutil，驗證中…" })).toHaveClass(/info/);
     await expect(page.locator(".log-line.success")).toContainText("工具就緒：");
     await expect(page.locator("#toolStatus")).toHaveClass(/ready/);
-    await expect(page.locator("#toolMessage")).toContainText("J-Link OK");
+    await expect(page.locator("#toolMessage")).toContainText("SEGGER J-Link V9.60 OK");
     // renderState overwrites the picked filename with the resolved command's basename.
     await expect(page.locator("#toolFileName")).toHaveText("nrf-factory-nrfutil");
     await expect(page.locator("#toolFileHint")).toHaveText("/tmp/nrf-factory-nrfutil");
@@ -98,7 +98,7 @@ test.describe("tool setup", () => {
             message: "device 命令安裝完成",
             done: true,
             success: true,
-            state: defaultState({ toolReady: true, toolMessage: "nrfutil 7.13.0 · device 2.7.6 · J-Link OK" }),
+            state: defaultState({ toolReady: true, toolMessage: "nrfutil 7.13.0 · device 2.7.6 · SEGGER J-Link V9.60 OK" }),
           },
         ]),
       }),
@@ -109,7 +109,7 @@ test.describe("tool setup", () => {
     await expect(page.locator("#terminal")).toContainText("開始安裝 nrfutil device 命令…（下載需一點時間）");
     await expect(page.locator(".log-line.success")).toContainText("device 命令安裝完成");
     await expect(page.locator("#toolStatus")).toHaveClass(/ready/);
-    await expect(page.locator("#toolMessage")).toContainText("J-Link OK");
+    await expect(page.locator("#toolMessage")).toContainText("SEGGER J-Link V9.60 OK");
     // Now that the device command is installed, the button greys out.
     await expect(page.locator("#installButton")).toBeDisabled();
     await expect(page.locator("#installButton")).toHaveText("device 命令已安裝");

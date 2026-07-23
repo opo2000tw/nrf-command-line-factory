@@ -165,7 +165,7 @@ xattr -d com.apple.quarantine nrf-factory-darwin-arm64
 ### 畫面操作（正常燒錄）
 
 1. 確認右上狀態點為**綠**，並顯示類似：
-   `nrfutil … · nrfutil-device … · J-Link OK`
+   `nrfutil … · nrfutil-device … · SEGGER J-Link V9.60 OK`
    - 紅點：缺 nrfutil、缺 `device` command、或缺 J-Link；依訊息安裝後**重開程式**。
 2. 點選 **.hex** 韌體（僅支援 `.hex`；檔案只在本次燒錄暫存，結束後刪除，不寫進程式）。
 3. 選 **L** 或 **R**（產品側別與成功計數分類；第一版**不**對應不同 probe）。

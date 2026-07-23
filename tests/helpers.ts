@@ -39,7 +39,7 @@ export function defaultState(overrides: Partial<AppState> = {}): AppState {
     busy: false,
     toolReady: true,
     deviceReady: true,
-    toolMessage: "nrfutil 7.13.0 · device 2.7.6 · J-Link OK",
+    toolMessage: "nrfutil 7.13.0 · device 2.7.6 · SEGGER J-Link V9.60 OK",
     command: "nrfutil",
     version: "test-1.2.3",
     ...overrides,

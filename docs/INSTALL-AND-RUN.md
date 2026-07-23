@@ -40,7 +40,7 @@ tested 版**非強制**：裝較新版的 J-Link 通常照跑（本機以 V9.60 
 啟動後右上狀態列成功時會顯示類似字串：
 
 ```text
-nrfutil 8.2.0 … · nrfutil-device 2.19.1 … · J-Link OK
+nrfutil 8.2.0 … · nrfutil-device 2.19.1 … · SEGGER J-Link V9.60 OK
 ```
 
 ### A.2 安裝 nRF Util
@@ -186,7 +186,7 @@ xattr -d com.apple.quarantine nrf-factory-darwin-arm64
 
 啟動後確認右上角狀態點：
 
-- **綠燈**：nrfutil、`device` 命令、J-Link 三者皆偵測正常，顯示類似 `nrfutil … · nrfutil-device … · J-Link OK`。
+- **綠燈**：nrfutil、`device` 命令、J-Link 三者皆偵測正常，顯示類似 `nrfutil … · nrfutil-device … · SEGGER J-Link V9.60 OK`（**必須**讀到本機安裝版號；讀不到會紅燈並要求重新安裝 J-Link）。
 - **紅燈**：缺 nrfutil、缺 `device` 命令、或缺 J-Link，畫面會標明缺哪一項；依訊息安裝後**重開程式**。
 
 正常燒錄操作順序：
