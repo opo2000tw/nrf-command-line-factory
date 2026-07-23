@@ -2,6 +2,15 @@
 
 本專案採 SemVer；git tag 慣例 `vMAJOR.MINOR.PATCH`。版號與 bump 規則見 `tickets/release-01-versioning-policy.md`。
 
+## [0.1.6]
+
+### Fixed
+- busy 狀態釋放改為 panic-safe：flash 與 install-device handler 補上與其他 handler 一致的 defer 安全網，避免極端情況下 busy 卡死導致所有操作回 409、需重啟才能恢復。
+
+### Changed
+- CI 警告清理（Go cache 與 Node 20 actions）。
+- 文件：AGENTS.md 新增 prlctl Windows VM 驗證流程（實測過的 EncodedCommand、共享交換、host 端拍照與各坑）；README 補手動補發 release 流程；tickets 全面稽核校正（package-02/release-02/run-04/package-04/test-01 過時敘述、補交叉引用）。
+
 ## [0.1.5]
 
 ### Added
