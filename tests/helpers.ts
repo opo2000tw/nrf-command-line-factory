@@ -9,6 +9,7 @@ export const FLASH_ROUTE = "**/api/flash";
 export const RESET_ROUTE = "**/api/reset";
 export const TOOL_ROUTE = "**/api/tool";
 export const INSTALL_ROUTE = "**/api/install-device";
+export const DETECT_ROUTE = "**/api/detect";
 
 // Mirror of the Go `snapshot` struct rendered by renderState() in index.html.
 export type AppState = {

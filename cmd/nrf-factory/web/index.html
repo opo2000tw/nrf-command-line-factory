@@ -313,6 +313,34 @@
       opacity: 0.42;
     }
 
+    .detect-block { margin-top: 22px; }
+
+    .detect-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .detect-button {
+      min-height: 46px;
+      padding: 0 22px;
+    }
+
+    .detect-status {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .detect-result {
+      color: var(--muted);
+      font: 600 12px/1.4 "SFMono-Regular", Consolas, monospace;
+    }
+
+    .detect-result.found { color: #13a777; }
+    .detect-result.missing { color: var(--failure); }
+
     .tool-setup {
       margin-top: 30px;
       padding-top: 22px;
@@ -460,6 +488,17 @@
           </div>
         </div>
 
+        <div class="detect-block">
+          <span class="label">待燒錄裝置</span>
+          <div class="detect-row">
+            <button id="detectButton" class="secondary detect-button" type="button">偵測裝置</button>
+            <span class="detect-status" role="status" aria-live="polite">
+              <span id="detectJLink" class="detect-result">J-Link：尚未偵測</span>
+              <span id="detectMCU" class="detect-result">MCU：尚未偵測</span>
+            </span>
+          </div>
+        </div>
+
         <div class="actions">
           <button id="flashButton" class="primary" type="button" disabled>開始燒錄 L</button>
           <button id="resetButton" class="secondary" type="button">清除計數</button>
@@ -508,6 +547,9 @@
     const toolFile = document.querySelector("#toolFile");
     const toolFileName = document.querySelector("#toolFileName");
     const installButton = document.querySelector("#installButton");
+    const detectButton = document.querySelector("#detectButton");
+    const detectJLink = document.querySelector("#detectJLink");
+    const detectMCU = document.querySelector("#detectMCU");
     let selectedSide = "L";
     let busy = false;
     let serverOnline = false;
@@ -566,6 +608,7 @@
       // device command already installed => nothing to install, so grey it out.
       installButton.disabled = busy || !serverOnline || deviceReady;
       installButton.textContent = deviceReady ? "device 命令已安裝" : "安裝 device 命令";
+      detectButton.disabled = busy || !serverOnline;
       stations.forEach(button => button.disabled = busy);
       refreshFlashButton();
     }
@@ -704,6 +747,44 @@
         }
         await readEvents(response.body);
       } catch (error) {
+        appendLog(networkHint(error), "error");
+        try {
+          await pingServer();
+        } catch (_) {
+          markOffline("本機服務已停止");
+        }
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    // One row of the detect panel; backend messages already name J-Link / MCU.
+    function renderDetectCheck(element, check) {
+      const state = check && typeof check.found === "boolean" ? check : { found: false, message: "偵測失敗" };
+      element.className = `detect-result ${state.found ? "found" : "missing"}`;
+      element.textContent = state.message;
+      appendLog(state.message, state.found ? "success" : "error");
+    }
+
+    detectButton.addEventListener("click", async () => {
+      if (busy) return;
+      detectJLink.className = "detect-result";
+      detectJLink.textContent = "J-Link：偵測中…";
+      detectMCU.className = "detect-result";
+      detectMCU.textContent = "MCU：偵測中…";
+      appendLog("偵測裝置：nrfutil device list · device-info");
+      setBusy(true);
+      try {
+        const response = await fetch("/api/detect", { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        renderDetectCheck(detectJLink, result.jlink);
+        renderDetectCheck(detectMCU, result.mcu);
+      } catch (error) {
+        detectJLink.className = "detect-result missing";
+        detectJLink.textContent = "J-Link：偵測失敗";
+        detectMCU.className = "detect-result missing";
+        detectMCU.textContent = "MCU：偵測失敗";
         appendLog(networkHint(error), "error");
         try {
           await pingServer();

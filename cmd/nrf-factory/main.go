@@ -106,6 +106,7 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("/api/flash", a.handleFlash)
 	mux.HandleFunc("/api/tool", a.handleTool)
 	mux.HandleFunc("/api/install-device", a.handleInstallDevice)
+	mux.HandleFunc("/api/detect", a.handleDetect)
 	return mux
 }
 
@@ -336,6 +337,102 @@ func (a *app) handleInstallDevice(w http.ResponseWriter, r *http.Request) {
 		message = "安裝逾時"
 	}
 	_ = stream.event("error", message, true, false, &state)
+}
+
+// detectCheck is one row of the detect panel: whether that thing is present
+// plus a human-readable message.
+type detectCheck struct {
+	Found   bool   `json:"found"`
+	Message string `json:"message"`
+}
+
+// detectResult reports the two-stage detection separately: the J-Link debug
+// probe (via `nrfutil device list`) and the target MCU behind it (via
+// `nrfutil device device-info`, which actually reads the chip).
+type detectResult struct {
+	JLink   detectCheck `json:"jlink"`
+	MCU     detectCheck `json:"mcu"`
+	Serials []string    `json:"serials,omitempty"`
+}
+
+// handleDetect runs two nrfutil commands (same on macOS and Windows; the
+// resolved binary handles the .exe): `device list` to find the J-Link probe,
+// then `device device-info` to confirm the MCU itself is connected and powered.
+// J-Link and MCU presence are reported as independent checks.
+func (a *app) handleDetect(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if !a.beginFlash() {
+		writeError(w, http.StatusConflict, "工作進行中，無法偵測")
+		return
+	}
+	defer a.clearBusy()
+
+	command := a.currentCommand()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Stage 1: the J-Link debug probe.
+	var listOut bytes.Buffer
+	listArgs := []string{"device", "list", "--traits", "jlink", "--json"}
+	if err := a.run(ctx, command, listArgs, &listOut); err != nil {
+		detail := strings.TrimSpace(listOut.String())
+		message := "無法列舉 J-Link，請確認已安裝 nrfutil device 命令"
+		if detail != "" {
+			message = "無法列舉 J-Link：" + detail
+		}
+		writeJSON(w, http.StatusOK, detectResult{
+			JLink: detectCheck{Message: message},
+			MCU:   detectCheck{Message: "無法偵測 MCU（需先確認 J-Link）"},
+		})
+		return
+	}
+
+	serials, err := parseJLinkSerials(listOut.Bytes())
+	if err != nil {
+		writeJSON(w, http.StatusOK, detectResult{
+			JLink: detectCheck{Message: "無法解析 J-Link 清單：" + err.Error()},
+			MCU:   detectCheck{Message: "無法偵測 MCU"},
+		})
+		return
+	}
+
+	switch len(serials) {
+	case 0:
+		writeJSON(w, http.StatusOK, detectResult{
+			JLink: detectCheck{Message: "未偵測到 J-Link，請確認 USB 連接"},
+			MCU:   detectCheck{Message: "無法偵測 MCU（需先接上 J-Link）"},
+		})
+		return
+	case 1:
+		// exactly one probe; continue to the MCU check
+	default:
+		writeJSON(w, http.StatusOK, detectResult{
+			Serials: serials,
+			JLink:   detectCheck{Message: "偵測到多個 J-Link，燒錄前請只保留一個：" + strings.Join(serials, ", ")},
+			MCU:     detectCheck{Message: "無法偵測 MCU（請只保留一個 J-Link）"},
+		})
+		return
+	}
+
+	serial := serials[0]
+	result := detectResult{
+		Serials: serials,
+		JLink:   detectCheck{Found: true, Message: "J-Link 已連接：" + serial},
+	}
+
+	// Stage 2: the target MCU behind the probe.
+	var infoOut bytes.Buffer
+	infoArgs := []string{"device", "device-info", "--serial-number", serial, "--json"}
+	if err := a.run(ctx, command, infoArgs, &infoOut); err != nil {
+		result.MCU = detectCheck{Message: "讀不到 MCU（晶片未連接或未供電）"}
+	} else {
+		result.MCU = detectCheck{Found: true, Message: "MCU 已連接"}
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func saveToolBinary(file io.Reader, header *multipart.FileHeader) (string, error) {

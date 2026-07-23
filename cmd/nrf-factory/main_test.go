@@ -20,6 +20,8 @@ import (
 )
 
 const oneJLink = `{"type":"info","data":{"devices":[{"serialNumber":"000802009570","traits":{"jlink":true}}]}}` + "\n"
+const zeroDevices = `{"type":"info","data":{"devices":[]}}` + "\n"
+const twoJLinks = `{"type":"info","data":{"devices":[{"serialNumber":"AAA","traits":{"jlink":true}},{"serialNumber":"BBB","traits":{"jlink":true}}]}}` + "\n"
 
 func TestParseJLinkSerials(t *testing.T) {
 	input := strings.Join([]string{
@@ -432,6 +434,78 @@ func TestFindBundledNRFUtil(t *testing.T) {
 	got, ok := findBundledNRFUtil([]string{thirdDir})
 	if !ok || got != bin {
 		t.Fatalf("findBundledNRFUtil = %q, %v; want %q, true", got, ok, bin)
+	}
+}
+
+func TestDetectDevice(t *testing.T) {
+	cases := []struct {
+		name          string
+		listOutput    string
+		listErr       error
+		infoErr       error
+		jlinkFound    bool
+		mcuFound      bool
+		jlinkContains string
+	}{
+		{"one+mcu", oneJLink, nil, nil, true, true, "000802009570"},
+		{"one-no-mcu", oneJLink, nil, errors.New("no core"), true, false, "000802009570"},
+		{"none", zeroDevices, nil, nil, false, false, "未偵測到"},
+		{"multiple", twoJLinks, nil, nil, false, false, "多個"},
+		{"error", "", errors.New("boom"), nil, false, false, "無法列舉"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			runner := func(_ context.Context, _ string, args []string, output io.Writer) error {
+				if len(args) < 2 || args[0] != "device" {
+					t.Fatalf("unexpected args %v", args)
+				}
+				switch args[1] {
+				case "list":
+					_, _ = io.WriteString(output, tc.listOutput)
+					return tc.listErr
+				case "device-info":
+					return tc.infoErr
+				default:
+					t.Fatalf("unexpected device subcommand %v", args)
+					return nil
+				}
+			}
+			application := newApp("nrfutil", runner, true, "ready")
+
+			recorder := httptest.NewRecorder()
+			application.handleDetect(recorder, httptest.NewRequest(http.MethodPost, "/api/detect", nil))
+
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+			}
+			var result detectResult
+			if err := json.Unmarshal(recorder.Body.Bytes(), &result); err != nil {
+				t.Fatal(err)
+			}
+			if result.JLink.Found != tc.jlinkFound {
+				t.Fatalf("jlink.found = %v, want %v (message %q)", result.JLink.Found, tc.jlinkFound, result.JLink.Message)
+			}
+			if result.MCU.Found != tc.mcuFound {
+				t.Fatalf("mcu.found = %v, want %v (message %q)", result.MCU.Found, tc.mcuFound, result.MCU.Message)
+			}
+			if !strings.Contains(result.JLink.Message, tc.jlinkContains) {
+				t.Fatalf("jlink message %q does not contain %q", result.JLink.Message, tc.jlinkContains)
+			}
+		})
+	}
+}
+
+func TestDetectRejectedWhileBusy(t *testing.T) {
+	application := newApp("nrfutil", nil, true, "ready")
+	if !application.beginFlash() {
+		t.Fatal("could not start flash")
+	}
+
+	recorder := httptest.NewRecorder()
+	application.handleDetect(recorder, httptest.NewRequest(http.MethodPost, "/api/detect", nil))
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusConflict)
 	}
 }
 
