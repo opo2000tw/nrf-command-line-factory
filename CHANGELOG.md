@@ -2,6 +2,15 @@
 
 本專案採 SemVer；git tag 慣例 `vMAJOR.MINOR.PATCH`。版號與 bump 規則見 `tickets/release-01-versioning-policy.md`。
 
+## [1.0.0]
+
+首個正式版。內容與 0.1.6 相同，宣告介面與操作流程穩定，0.1.x 系列的功能自此視為正式基線：
+
+- 燒錄流程：外部 .hex 選取、L/R 側別、燒錄與成功計數、清除計數；燒錄期間 UI 鎖定、瀏覽器斷線不中斷硬體寫入、關窗前確認。
+- 環境偵測：preflight 回報 nrfutil core / device 版本與 SEGGER J-Link 實際安裝版本；偵測裝置按鈕分別回報 J-Link 與 MCU 存在狀態；一鍵安裝 device 命令（已安裝自動灰化）。
+- 交付：release zip 內附 nrfutil（3rd/），解壓即用；zip 佈局鏡射開發樹；SHA256SUMS 與內容驗證納入 release workflow。
+- 品質：Go 單元測試與 Playwright UI 功能測試（CI 全跑），macOS 與 Windows（Parallels VM）雙平台實測驗證。
+
 ## [0.1.6]
 
 ### Fixed
