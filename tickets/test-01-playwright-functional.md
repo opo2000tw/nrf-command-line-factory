@@ -16,6 +16,7 @@ web UI 的按鈕與輸入原本沒有自動化功能測試,回歸只靠手動。
 - [x] reset:清除成功、409 衝突、忙碌與離線停用
 - [x] tool 上傳與 install-device:就緒/仍缺、HTTP 錯誤、忙碌鎖定、內附 3rd/ 命令顯示
 - [x] CI 新增 ui-test job 一併執行
+- [x] 後續擴充（v0.1.5）：偵測裝置按鈕（detect.spec.ts：J-Link/MCU 兩段結果、多裝置、忙碌鎖定、離線停用）、install 按鈕依 deviceReady 灰化、preflight 的 SEGGER J-Link 版本字串顯示
 
 ## 相關
 - 檔案: tests/*.spec.ts, tests/helpers.ts, playwright.config.ts, .github/workflows/ci.yml

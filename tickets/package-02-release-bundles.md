@@ -10,7 +10,7 @@
 ## 驗收條件
 - [x] 每個平台都產出 `nrf-factory-<version>-<os>-<arch>.zip`，內含 `dist/` 執行檔、CHANGELOG.md、docs/INSTALL-AND-RUN.md
 - [x] 產出對應的 SHA256SUMS 檔案
-- [x] 壓縮包不包含韌體檔、nrfutil、J-Link 等外部工具
+- [x] 壓縮包不包含韌體檔與 J-Link；nrfutil 自 v0.1.2 起改為內附（`3rd/`，Makefile package 打入 zip），原「不含 nrfutil」條件已被此決策推翻，授權評估見 release-03
 - [x] 打包步驟納入 build 腳本或 release 流程，不需手動操作
 
 ## 相關

@@ -5,7 +5,7 @@
 - 狀態: todo
 
 ## 背景
-PLAN.md 最初明文「nrfutil、device command 與 SEGGER J-Link 皆不嵌入(各帶 Nordic／SEGGER 授權,不由本程式重散布)」。v0.1.2 的變更「Bundle nrfutil in 3rd/ and auto-use it」把 nrfutil 內附進 release zip 並自動採用,實質推翻了這條以授權為由的設計原則,但沒有任何 ticket 記錄授權重新評估,PLAN.md 相關段落也未更新。此外 3rd/ 的二進位以一般 blob 提交,缺來源/版本/雜湊/授權的可稽核 manifest。
+源自三方審查（見 .docs/reviews/2026-07-23-improvement-review.md）。PLAN.md 最初明文「nrfutil、device command 與 SEGGER J-Link 皆不嵌入(各帶 Nordic／SEGGER 授權,不由本程式重散布)」。v0.1.2 的變更「Bundle nrfutil in 3rd/ and auto-use it」把 nrfutil 內附進 release zip 並自動採用,實質推翻了這條以授權為由的設計原則,但沒有任何 ticket 記錄授權重新評估,PLAN.md 相關段落也未更新。此外 3rd/ 的二進位以一般 blob 提交,缺來源/版本/雜湊/授權的可稽核 manifest。
 
 ## 驗收條件
 - [ ] 確認 nRF Util 的授權條款是否允許以此方式重新散布;結論寫入 .docs/decisions/

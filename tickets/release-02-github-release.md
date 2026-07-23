@@ -10,9 +10,9 @@
 ## 驗收條件
 - [x] push `v*` tag 時觸發 GitHub Actions matrix 建置 windows / darwin
 - [x] 建置完成後依 package-02 的規則打包，並產出 SHA256SUMS
-- [x] 以 `gh release` 或對應 action 建立 Release，附上各平台 zip、checksums，以及取自 CHANGELOG 的 release notes
+- [x] 以 `gh release create` 建立 Release，附上各平台 zip 與 checksums；release notes 用 `--generate-notes` 由 GitHub 自動生成（不讀 CHANGELOG.md，逐版變更仍以 CHANGELOG 為準）
 - [x] 產物版本與 tag 一致（串接 build-02 的版本注入）
-- [x] 文件化手動 fallback 流程，說明如何用本機 `gh release create` 補發
+- [x] 文件化手動 fallback 流程，說明如何用本機 `gh release create` 補發（README「取得執行檔」節）
 
 ## 相關
 - 檔案: .github/workflows/release.yml, .github/workflows/ci.yml

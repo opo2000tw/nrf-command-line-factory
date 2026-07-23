@@ -5,7 +5,7 @@
 - 狀態: todo
 
 ## 背景
-目前的 signal 處理只接了 `os.Interrupt`（Ctrl+C）。在 Windows 上關閉 console 視窗會觸發 `CTRL_CLOSE_EVENT`，目前的收尾行為只是 best-effort，可能來不及完成 server shutdown 或 kill 瀏覽器程序。
+signal 處理現已接 `os.Interrupt` 與 `syscall.SIGTERM`，並有 busy-aware graceful shutdown（燒錄中會等待完成、逾時上限、二次訊號強制停止）。但 Windows 上關閉 console 視窗觸發的是 `CTRL_CLOSE_EVENT`，Go 預設不會轉成上述 signal 路徑（無 `SetConsoleCtrlHandler` 專屬處理），收尾仍是 best-effort，可能來不及完成 server shutdown 或 kill 瀏覽器程序。
 
 ## 驗收條件
 - [ ] 確認並盡量處理 Windows console close 事件下的 graceful shutdown，涵蓋 server shutdown 與 browser kill

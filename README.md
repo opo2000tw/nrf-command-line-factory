@@ -109,7 +109,9 @@ GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w" \
   -o dist/nrf-factory-windows-amd64.exe ./cmd/nrf-factory
 ```
 
-推送 `v*` git tag 會觸發 GitHub Actions 的 Release workflow：自動建置、`make package`，並以 `gh release create` 附上各平台 zip 與 `SHA256SUMS`。版本規則與逐版變更見 [CHANGELOG.md](CHANGELOG.md)。
+推送 `v*` git tag 會觸發 GitHub Actions 的 Release workflow：自動建置、`make package`，並以 `gh release create` 附上各平台 zip 與 `SHA256SUMS`（release notes 由 `--generate-notes` 自動生成；逐版變更以 CHANGELOG 為準）。版本規則與逐版變更見 [CHANGELOG.md](CHANGELOG.md)。
+
+若 workflow 失敗需手動補發：在本機對該 tag 執行 `make package VERSION=<tag>`，確認 `dist/` 產物與 `SHA256SUMS` 後，用 `gh release create <tag> dist/*.zip dist/SHA256SUMS --title "nRF Factory <tag>" --generate-notes` 補上；若 Release 已存在改用 `gh release upload <tag> dist/*.zip dist/SHA256SUMS`。
 
 ### 啟動
 

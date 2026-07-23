@@ -2,6 +2,15 @@
 
 本專案採 SemVer；git tag 慣例 `vMAJOR.MINOR.PATCH`。版號與 bump 規則見 `tickets/release-01-versioning-policy.md`。
 
+## [0.1.5]
+
+### Added
+- 偵測裝置按鈕：一鍵回報兩個獨立狀態——J-Link 是否連接（`nrfutil device list`）與 MCU 是否存在（`nrfutil device device-info` 實際讀晶片），各自紅綠顯示；無探針或無晶片時給出明確指引，macOS 與 Windows 同流程。
+- preflight 顯示 SEGGER J-Link 實際安裝版本（如 `SEGGER J-Link V9.60 OK`）：解析 SEGGER pack 目錄（V960、V924a 形式）、優先採 active install 或最新版；缺 J-Link 或讀不到版本時，訊息附上 nrfutil device 命令的 tested 版（如 V9.24a）指出該裝哪版。
+
+### Changed
+- 「安裝 device 命令」按鈕在 device 命令已安裝時灰化並顯示已安裝，不再可重複觸發。
+
 ## [0.1.4]
 
 ### Fixed

@@ -15,4 +15,5 @@
 
 ## 相關
 - 檔案: cmd/nrf-factory
-- 依賴: build-01（此為 browser session commit 標記的第二步）
+- 依賴: build-01
+- 關聯: run-04（windowsgui 變體會縮小 console close 事件的影響範圍，見該 ticket）（此為 browser session commit 標記的第二步）
